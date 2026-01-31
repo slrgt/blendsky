@@ -763,6 +763,51 @@ body {
   margin-bottom: 0.35rem;
 }
 
+.forum-discover-byline {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.forum-discover-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.forum-discover-avatar-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.forum-discover-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.forum-discover-handle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-left: 0.25rem;
+}
+
+.forum-your-threads-title {
+  font-size: 1.1rem;
+  margin: 1.5rem 0 0.75rem;
+}
+
 .forum-discover-author-meta {
   margin: 0;
   font-size: 0.85rem;
