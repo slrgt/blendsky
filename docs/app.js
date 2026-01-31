@@ -537,6 +537,51 @@ fetch('config.json')
     updateWikiStatus(slug);
     var reqEdit = document.getElementById('wiki-request-edit');
     if (reqEdit) reqEdit.classList.toggle('hidden', !page.atUri);
+    var suggestEdit = document.getElementById('wiki-suggest-edit');
+    if (suggestEdit) suggestEdit.classList.toggle('hidden', !page.atUri);
+    var replies = page.replies || [];
+    var repliesList = document.getElementById('wiki-replies-list');
+    if (repliesList) {
+      repliesList.innerHTML = replies.map(function (r, idx) {
+        return (
+          '<li class="wiki-reply-item" data-reply-index="' + idx + '">' +
+          '<div class="wiki-reply-header">' +
+          '<span class="author">' + escapeHtml(r.author || 'Anonymous') + '</span>' +
+          '<button type="button" class="wiki-quote-btn btn btn-ghost btn-sm" data-reply-index="' + idx + '" aria-label="Quote this reply">Quote</button>' +
+          '</div>' +
+          '<div class="wiki-reply-text">' + bodyToHtml(r.text || '') + '</div>' +
+          '</li>'
+        );
+      }).join('');
+      attachWikiQuoteButtons(slug);
+    }
+    var replyForm = document.getElementById('wiki-reply-form');
+    if (replyForm) replyForm.dataset.wikiSlug = slug;
+    var replyBody = document.getElementById('wiki-reply-body');
+    if (replyBody) replyBody.value = '';
+  }
+
+  function attachWikiQuoteButtons(slug) {
+    var pages = getWikiPages();
+    var page = pages[slug];
+    var replyList = (page && page.replies) || [];
+    var listEl = document.getElementById('wiki-replies-list');
+    if (!listEl) return;
+    listEl.querySelectorAll('.wiki-quote-btn').forEach(function (btn) {
+      var idx = parseInt(btn.getAttribute('data-reply-index'), 10);
+      var r = replyList[idx];
+      if (!r) return;
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var plain = (r.text || '').replace(/\n/g, '\n> ');
+        var quote = '> ' + (r.author || 'Anonymous') + ' wrote:\n> ' + plain + '\n\n';
+        var ta = document.getElementById('wiki-reply-body');
+        if (ta) {
+          ta.value = quote + (ta.value ? '\n' + ta.value : '');
+          ta.focus();
+        }
+      });
+    });
   }
 
   function updateWikiStatus(slug) {
@@ -727,6 +772,7 @@ fetch('config.json')
       if (existing.remixedFrom) pages[newSlug].remixedFrom = existing.remixedFrom;
       if (existing.createdBy) pages[newSlug].createdBy = existing.createdBy;
       if (existing.createdAt) pages[newSlug].createdAt = existing.createdAt;
+      if (Array.isArray(existing.replies)) pages[newSlug].replies = existing.replies.slice();
       var history = Array.isArray(existing.history) ? existing.history.slice() : [];
       history.push({ body: existing.body || '', title: existing.title, by: by, at: now });
       if (history.length > 50) history = history.slice(-50);
@@ -735,6 +781,7 @@ fetch('config.json')
       pages[newSlug].createdBy = by;
       pages[newSlug].createdAt = now;
       pages[newSlug].history = [];
+      pages[newSlug].replies = [];
     }
     setWikiPages(pages);
     currentWikiSlug = newSlug;
@@ -807,6 +854,17 @@ fetch('config.json')
     window.open(url, '_blank', 'noopener');
   });
 
+  document.getElementById('wiki-suggest-edit').addEventListener('click', function () {
+    if (!currentWikiSlug) return;
+    var pages = getWikiPages();
+    var page = pages[currentWikiSlug];
+    if (!page || !page.atUri) return;
+    var title = page.title || 'Untitled';
+    var text = 'I suggested an edit to your wiki article "' + title + '". Link: ' + page.atUri + ' — Paste your suggested change below.';
+    var url = 'https://bsky.app/intent/compose?text=' + encodeURIComponent(text);
+    window.open(url, '_blank', 'noopener');
+  });
+
   document.getElementById('wiki-remix').addEventListener('click', function () {
     if (!currentWikiSlug) return;
     var pages = getWikiPages();
@@ -817,7 +875,7 @@ fetch('config.json')
     var newSlug = slugify(newTitle);
     var body = page.body || '';
     if (page.atUri) body = 'Remixed from: ' + page.atUri + '\n\n' + body;
-    var newPage = { title: newTitle, body: body };
+    var newPage = { title: newTitle, body: body, replies: [] };
     if (page.atUri) newPage.remixedFrom = page.atUri;
     pages[newSlug] = newPage;
     setWikiPages(pages);
@@ -828,6 +886,26 @@ fetch('config.json')
     document.getElementById('wiki-view').classList.add('hidden');
     document.getElementById('wiki-edit').classList.remove('hidden');
   });
+
+  document.getElementById('wiki-reply-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var slug = this.dataset.wikiSlug;
+    if (!slug) return;
+    var text = document.getElementById('wiki-reply-body').value.trim();
+    if (!text) return;
+    var pages = getWikiPages();
+    var page = pages[slug];
+    if (!page) return;
+    if (!page.replies) page.replies = [];
+    var session = getStoredSession();
+    var author = (session && session.handle) ? '@' + session.handle : 'You';
+    page.replies.push({ author: author, text: text });
+    setWikiPages(pages);
+    openWikiPage(slug);
+  });
+
+  var wikiFromOthersRefreshBtn = document.getElementById('wiki-from-others-refresh');
+  if (wikiFromOthersRefreshBtn) wikiFromOthersRefreshBtn.addEventListener('click', function () { loadWikiFromOthers(); });
 
   (function () {
     var historyPanel = document.getElementById('wiki-history-panel');
@@ -1597,7 +1675,8 @@ fetch('config.json')
         title: imported.title || 'Untitled',
         body: imported.body || '',
         atUri: uri,
-        createdBy: imported.createdBy || author || 'AT Protocol'
+        createdBy: imported.createdBy || author || 'AT Protocol',
+        replies: []
       };
       setWikiPages(pages);
       renderWikiList();

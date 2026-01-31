@@ -98,15 +98,25 @@
             <h1 id="wiki-title"></h1>
             <p id="wiki-sync-status" class="sync-status" aria-live="polite"></p>
             <p id="wiki-byline" class="wiki-byline muted" aria-live="polite"></p>
-            <p class="wiki-edits-hint muted"><small>Edits sync to Bluesky. Remix creates a fork. Request edit opens Bluesky compose.</small></p>
+            <p class="wiki-edits-hint muted"><small>Edits sync to Bluesky. Remix creates a fork. Suggest edit sends your change to the author via Bluesky.</small></p>
             <div id="wiki-body" class="wiki-body"></div>
             <div class="wiki-view-actions">
               <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
               <button type="button" id="wiki-sync-bluesky" class="btn btn-secondary">Sync to Bluesky</button>
               <button type="button" id="wiki-request-edit" class="btn btn-ghost hidden">Request edit</button>
+              <button type="button" id="wiki-suggest-edit" class="btn btn-ghost hidden">Suggest edit</button>
               <button type="button" id="wiki-remix" class="btn btn-secondary">Remix</button>
               <button type="button" id="wiki-history-btn" class="btn btn-ghost">History</button>
             </div>
+            <section class="wiki-discussion">
+              <h3>Discussion</h3>
+              <p class="wiki-discussion-hint muted"><small>Reply to this article. Quote a reply to reference it.</small></p>
+              <ul id="wiki-replies-list" class="wiki-replies-list"></ul>
+              <form id="wiki-reply-form" class="wiki-reply-form">
+                <textarea id="wiki-reply-body" placeholder="Write a reply…" rows="3"></textarea>
+                <button type="submit" class="btn btn-primary">Reply</button>
+              </form>
+            </section>
           </div>
           <div id="wiki-history-panel" class="wiki-history-panel hidden">
             <div class="wiki-history-header">
@@ -131,8 +141,11 @@
         </article>
       </div>
       <div id="wiki-from-others" class="wiki-from-others">
-        <h3>Wiki articles from others</h3>
-        <p class="wiki-from-others-hint muted">Articles from others who synced to Bluesky from <strong>this app URL</strong> (Standard.site). Click a card or <strong>Open in Wiki</strong> to view and edit; use <strong>Remix</strong> to copy and adapt. Sync your pages to Bluesky so others can see and work on wikis together.</p>
+        <div class="wiki-from-others-header">
+          <h3>Wiki articles from others</h3>
+          <button type="button" id="wiki-from-others-refresh" class="btn btn-ghost btn-sm" title="Reload articles from everyone">Refresh</button>
+        </div>
+        <p class="wiki-from-others-hint muted">Articles from others who synced to Bluesky from <strong>this app URL</strong> (Standard.site). Click a card or <strong>Open in Wiki</strong> to view, reply in Discussion, edit your copy, or <strong>Suggest edit</strong> to send changes to the author. Use <strong>Remix</strong> to fork and adapt. Sync your pages so others can see and collaborate.</p>
         <div id="wiki-from-others-feed" class="wiki-from-others-feed"><p class="muted" id="wiki-from-others-loading">Loading…</p></div>
       </div>
     </section>
