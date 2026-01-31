@@ -939,8 +939,17 @@ body {
   margin: 0;
 }
 
-.forum-reply-on-bluesky {
+.forum-view-on-bluesky {
   margin: 0.75rem 0 0;
+}
+
+.forum-replies-hint {
+  margin: 0 0 0.5rem;
+}
+
+.forum-discover-loading {
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .forum-thread-list {
@@ -1057,6 +1066,12 @@ body {
 .forum-reply .text {
   font-size: 0.95rem;
   color: var(--text);
+}
+
+.forum-reply .text .user-content-img {
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: var(--radius);
 }
 
 .forum-reply-form {

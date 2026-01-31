@@ -752,7 +752,7 @@ fetch('config.json')
     }
     var replyPostUrl = thread.feedPostUri ? feedPostUriToBskyUrl(thread.feedPostUri) : null;
     if (replyPostUrl) {
-      body += '<p class="forum-reply-on-bluesky"><a href="' + escapeHtml(replyPostUrl) + '" target="_blank" rel="noopener" class="btn btn-secondary">Reply on Bluesky</a></p>';
+      body += '<p class="forum-view-on-bluesky muted"><small><a href="' + escapeHtml(replyPostUrl) + '" target="_blank" rel="noopener">View on Bluesky</a></small></p>';
     }
     body += '</div></div>';
     detail.innerHTML = body;
@@ -945,6 +945,23 @@ fetch('config.json')
     }
   });
 
+  document.getElementById('forum-reply-image').addEventListener('change', function () {
+    var input = this;
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var session = getStoredSession();
+    if (!session || !session.accessJwt) {
+      alert('Connect your Bluesky account first (Bluesky tab) to upload images.');
+      input.value = '';
+      return;
+    }
+    uploadBlobToBluesky(file).then(function (blobUrl) {
+      insertImageIntoBody('forum-reply-body', blobUrl);
+    }).catch(function (err) {
+      alert('Upload failed: ' + (err.message || 'unknown'));
+    }).then(function () { input.value = ''; });
+  });
+
   document.getElementById('forum-reply-form').addEventListener('submit', function (e) {
     e.preventDefault();
     const id = Number(this.dataset.threadId);
@@ -1072,6 +1089,33 @@ fetch('config.json')
     }
   }
 
+  /** Import a document by AT URI and open it in the forum (or open existing if already imported). Returns Promise. */
+  function doImportAndOpen(uri) {
+    var forumData = getForumData();
+    var existing = forumData.threads.find(function (t) { return t.atUri === uri; });
+    if (existing) {
+      openThread(existing.id);
+      return Promise.resolve();
+    }
+    var req = API
+      ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
+      : fetchAtRecord(uri);
+    return req.then(function (data) {
+      if (typeof BlendskyLexicon === 'undefined') throw new Error('BlendskyLexicon not loaded');
+      var record = data.value || data.record || data;
+      var author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
+      var thread = BlendskyLexicon.recordToThread(record, uri, author);
+      if (!thread) throw new Error('Could not parse document');
+      var fd = getForumData();
+      var newId = fd.nextId++;
+      thread.id = newId;
+      fd.threads.push(thread);
+      setForumData(fd);
+      renderThreadList();
+      openThread(newId);
+    });
+  }
+
   document.getElementById('forum-import-btn').addEventListener('click', function () {
     var uriInput = document.getElementById('forum-import-uri');
     var raw = (uriInput && uriInput.value && uriInput.value.trim()) || '';
@@ -1083,23 +1127,8 @@ fetch('config.json')
       ? Promise.resolve(raw)
       : resolveUrlToAtUri(raw);
     atUriPromise.then(function (uri) {
-      var req = API
-        ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
-        : fetchAtRecord(uri);
-      return req.then(function (data) {
-        if (typeof BlendskyLexicon === 'undefined') throw new Error('BlendskyLexicon not loaded');
-        var record = data.value || data.record || data;
-        var author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
-        var thread = BlendskyLexicon.recordToThread(record, uri, author);
-        if (!thread) throw new Error('Could not parse document');
-        var forumData = getForumData();
-        var newId = forumData.nextId++;
-        thread.id = newId;
-        forumData.threads.push(thread);
-        setForumData(forumData);
-        renderThreadList();
-        openThread(newId);
-        uriInput.value = '';
+      return doImportAndOpen(uri).then(function () {
+        if (uriInput) uriInput.value = '';
       });
     }).catch(function (err) {
       alert('Import failed: ' + (err.message || 'unknown'));
@@ -1238,12 +1267,16 @@ fetch('config.json')
           if (!uri) return;
           a.addEventListener('click', function (e) {
             e.preventDefault();
-            var input = document.getElementById('forum-import-uri');
-            if (input) {
-              input.value = uri;
-              input.focus();
-              document.querySelector('.forum-import-export').scrollIntoView({ behavior: 'smooth' });
-            }
+            wrapEl.classList.add('forum-discover-loading');
+            a.setAttribute('aria-busy', 'true');
+            doImportAndOpen(uri).then(function () {
+              wrapEl.classList.remove('forum-discover-loading');
+              a.removeAttribute('aria-busy');
+            }).catch(function (err) {
+              wrapEl.classList.remove('forum-discover-loading');
+              a.removeAttribute('aria-busy');
+              alert('Import failed: ' + (err.message || 'unknown'));
+            });
           });
         });
       });
