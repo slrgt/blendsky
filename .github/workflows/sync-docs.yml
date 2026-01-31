@@ -1,0 +1,30 @@
+# Keep docs/ in sync with app/ for GitHub Pages.
+# When you push changes to app/, this copies them to docs/ so Pages serves the latest app.
+name: Sync docs for GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy app to docs
+        run: |
+          mkdir -p docs
+          cp app/index.html app/app.js app/standard-site.js app/styles.css docs/
+          touch docs/.nojekyll
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          git diff --staged --quiet || (git commit -m "chore: sync app to docs for GitHub Pages" && git push)
