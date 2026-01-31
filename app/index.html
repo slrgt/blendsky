@@ -46,6 +46,11 @@
           <a href="#" class="cta" data-nav="bluesky">Connect & view feed</a>
         </article>
       </div>
+      <div id="home-constellation" class="home-constellation hidden">
+        <h2>AT Protocol index</h2>
+        <p class="constellation-intro">Stats from the <a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener">Constellation</a> index (atproto-wide backlinks). Explore lexicons at <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a>.</p>
+        <dl class="constellation-stats" id="constellation-stats"></dl>
+      </div>
       <p class="ready">Ready to share?</p>
       <p class="sub">Use <strong>Wiki</strong> for docs, <strong>Forum</strong> for JSON node setups and discussion, and <strong>Bluesky</strong> to connect.</p>
     </section>
@@ -65,6 +70,7 @@
           <div id="wiki-view" class="wiki-view">
             <h1 id="wiki-title"></h1>
             <p id="wiki-sync-status" class="sync-status" aria-live="polite"></p>
+            <p class="wiki-edits-hint muted"><small>Edits sync to Bluesky — app views like <a href="https://anisota.net" target="_blank" rel="noopener">anisota.net</a> show updated content.</small></p>
             <div id="wiki-body" class="wiki-body"></div>
             <div class="wiki-view-actions">
               <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
@@ -95,6 +101,7 @@
         <button type="button" id="forum-back" class="btn btn-ghost">← Back to threads</button>
         <article id="forum-thread-detail"></article>
         <div id="forum-thread-standard" class="forum-thread-standard hidden">
+          <button type="button" id="forum-edit-thread-btn" class="btn btn-secondary">Edit thread</button>
           <button type="button" id="forum-export-standard" class="btn btn-secondary">Export as standard.site document</button>
           <button type="button" id="forum-sync-bluesky" class="btn btn-secondary">Sync to Bluesky</button>
         </div>
@@ -116,6 +123,18 @@
           <textarea id="forum-new-body" placeholder="Paste JSON geometry node setup or write your post…" rows="5" required></textarea>
           <input type="text" id="forum-new-tags" class="forum-optional" placeholder="Tags, comma-separated" />
           <button type="submit" class="btn btn-primary">Create thread</button>
+        </form>
+      </div>
+      <div id="forum-edit-view" class="forum-edit-view hidden">
+        <button type="button" id="forum-edit-cancel" class="btn btn-ghost">← Cancel</button>
+        <p class="forum-edit-hint muted">Edits sync to Bluesky — app views like <a href="https://anisota.net" target="_blank" rel="noopener">anisota.net</a> show updated content.</p>
+        <form id="forum-edit-form" class="forum-edit-form">
+          <input type="text" id="forum-edit-title" placeholder="Thread title (required)" required />
+          <input type="text" id="forum-edit-path" class="forum-optional" placeholder="Path/slug" />
+          <textarea id="forum-edit-description" class="forum-optional" placeholder="Short description" rows="2"></textarea>
+          <textarea id="forum-edit-body" placeholder="Paste JSON geometry node setup or write your post…" rows="5" required></textarea>
+          <input type="text" id="forum-edit-tags" class="forum-optional" placeholder="Tags, comma-separated" />
+          <button type="submit" class="btn btn-primary">Save changes & sync to Bluesky</button>
         </form>
       </div>
       <div class="forum-import-export">
