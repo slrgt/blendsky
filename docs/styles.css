@@ -128,6 +128,18 @@ body {
   box-shadow: var(--shadow);
 }
 
+.home-recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.home-recent-header .home-section-title {
+  margin: 0;
+}
+
 .home-section-title {
   font-family: var(--font-serif);
   font-size: 1.25rem;

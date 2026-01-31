@@ -33,8 +33,11 @@
     <!-- Home -->
     <section id="view-home" class="view view-active">
       <section class="home-section home-recent-section">
-        <h2 class="home-section-title">Recent forum posts &amp; wiki articles</h2>
-        <p id="home-recent-desc" class="home-section-desc muted">Your latest wiki pages and forum threads.</p>
+        <div class="home-recent-header">
+          <h2 class="home-section-title">Recent forum posts &amp; wiki articles</h2>
+          <button type="button" id="home-recent-refresh" class="btn btn-ghost btn-sm" title="Reload posts from other users">Refresh</button>
+        </div>
+        <p id="home-recent-desc" class="home-section-desc muted">Posts from other users who synced to the blendsky forum or wiki.</p>
         <div id="home-recent-feed" class="home-recent-feed"></div>
       </section>
 
