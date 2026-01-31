@@ -116,18 +116,18 @@
     <section id="view-forum" class="view">
       <div class="forum-toolbar">
         <h2>Forum</h2>
-        <p class="forum-tagline">Start a thread, reply to others, and sync to Bluesky so the community can find you. Geometry node JSON is optional.</p>
+        <p class="forum-tagline">Synced across accounts — share and remix Blender tutorials. Start a thread, sync to Bluesky, and the community sees it. Geometry node JSON is optional.</p>
         <button type="button" id="forum-new-thread" class="btn btn-primary">New thread</button>
       </div>
       <div id="forum-discover" class="forum-discover">
         <div class="forum-discover-header">
-          <h3>Forum posts from the community</h3>
-          <button type="button" id="forum-discover-refresh-btn" class="btn btn-ghost btn-sm forum-discover-refresh-btn" title="Reload posts from other users">Refresh</button>
+          <h3>Community forum</h3>
+          <button type="button" id="forum-discover-refresh-btn" class="btn btn-ghost btn-sm forum-discover-refresh-btn" title="Reload threads from everyone">Refresh</button>
         </div>
-        <p class="forum-discover-hint muted">Posts from others using <strong>Standard.site</strong> (<code>site.standard.document</code>) — click a card to open and reply, or paste an AT URI below to import.</p>
+        <p class="forum-discover-hint muted">Threads from everyone who syncs to Bluesky. Open a thread to read and reply; use <strong>Remix</strong> to copy a tutorial and adapt it as your own.</p>
         <div id="forum-discover-feed" class="forum-discover-feed"><p class="muted" id="forum-discover-loading">Loading…</p></div>
       </div>
-      <h3 class="forum-your-threads-title">Your threads</h3>
+      <h3 class="forum-your-threads-title">My threads</h3>
       <div id="forum-thread-list" class="forum-thread-list"></div>
       <div id="forum-thread-view" class="forum-thread-view hidden">
         <button type="button" id="forum-back" class="btn btn-ghost">← Back to threads</button>

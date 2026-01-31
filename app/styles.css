@@ -953,6 +953,15 @@ body {
   font-family: monospace;
 }
 
+.forum-discover-actions {
+  margin: 0.5rem 0 0;
+  padding-left: 0.25rem;
+}
+
+.forum-discover-remix-btn {
+  font-size: 0.9rem;
+}
+
 .form-actions-inline {
   display: flex;
   align-items: center;
