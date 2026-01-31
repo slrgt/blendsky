@@ -2251,6 +2251,7 @@ body {
 }
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 #view-forum .forum-reply-form textarea {
   border: 1px solid var(--f-border);
   border-radius: var(--f-radius);
@@ -2259,6 +2260,8 @@ body {
 }
 
 /* New / Edit views: minimal form */
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 #view-forum #forum-new-view,
