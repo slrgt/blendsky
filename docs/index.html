@@ -19,6 +19,13 @@
       <a href="#" class="nav-link" data-nav="wiki">Wiki</a>
       <a href="#" class="nav-link" data-nav="forum">Forum</a>
       <a href="#" class="nav-link" data-nav="bluesky">Bluesky</a>
+      <span id="header-login-wrap" class="header-auth-wrap">
+        <a href="#" id="header-login-link" class="nav-link" data-nav="bluesky">Log in</a>
+      </span>
+      <span id="header-user-wrap" class="header-auth-wrap hidden">
+        <span class="header-user-label">Logged in as</span>
+        <a href="#" id="header-user-link" class="nav-link header-user-handle" data-nav="bluesky"></a>
+      </span>
     </nav>
   </header>
 
@@ -113,8 +120,11 @@
         <button type="button" id="forum-new-thread" class="btn btn-primary">New thread</button>
       </div>
       <div id="forum-discover" class="forum-discover">
-        <h3>Forum posts from the community</h3>
-        <p class="forum-discover-hint muted">Posts from others using the <strong>app.blendsky.document</strong> lexicon and <strong>#blendsky-forum</strong>. Reply in the forum below. To add a thread from someone else, click a card to import and open it, or paste its AT URI below.</p>
+        <div class="forum-discover-header">
+          <h3>Forum posts from the community</h3>
+          <button type="button" id="forum-discover-refresh-btn" class="btn btn-ghost btn-sm forum-discover-refresh-btn" title="Reload posts from other users">Refresh</button>
+        </div>
+        <p class="forum-discover-hint muted">Posts from others using the forum. Log in to see them; click a card to open and reply. Or paste an AT URI below to import a thread.</p>
         <div id="forum-discover-feed" class="forum-discover-feed"><p class="muted" id="forum-discover-loading">Loading…</p></div>
       </div>
       <h3 class="forum-your-threads-title">Your threads</h3>
@@ -221,7 +231,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>blendsky — Forum for Blender users sharing JSON geometry node setups</p>
+    <p>blendsky — Forum for Blender users sharing JSON geometry node setups<span id="app-version"></span></p>
   </footer>
 
   <script src="blendsky-lexicon.js"></script>

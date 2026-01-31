@@ -10,6 +10,9 @@ fetch('config.json')
     // Never use same-origin as OAuth backend (e.g. GitHub Pages has no /api/auth)
     var API = apiBase && apiBase.replace(/\/$/, '') !== window.location.origin ? apiBase : '';
 
+    var versionEl = document.getElementById('app-version');
+    if (versionEl && config && config.version) versionEl.textContent = ' v' + String(config.version);
+
     (function () {
       'use strict';
 
@@ -1160,8 +1163,9 @@ fetch('config.json')
 
   function loadForumDiscover() {
     var wrap = document.getElementById('forum-discover-feed');
+    if (!wrap) return;
+    wrap.innerHTML = '<p class="muted" id="forum-discover-loading">Loading…</p>';
     var loading = document.getElementById('forum-discover-loading');
-    if (!wrap || !loading) return;
     var origin = typeof location !== 'undefined' ? location.origin : '';
     var lexiconPromise = origin
       ? fetchConstellationLinks(origin, 'app.blendsky.document', '.site', 25).then(function (links) {
@@ -1179,18 +1183,20 @@ fetch('config.json')
       : Promise.resolve([]);
     var feedPromise = searchPostsBluesky('#blendsky-forum', 25).then(function (data) {
       var posts = (data && data.posts) || (data && data.feed) || [];
-      return posts.map(function (p) {
+      return { cards: posts.map(function (p) {
         var author = p.author || {};
         var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 160) : '';
         if (text.length === 160) text += '…';
         return { _type: 'feed', post: p, snippet: text };
-      });
+      }), searchFailed: false };
     }).catch(function (err) {
-      return [];
+      return { cards: [], searchFailed: true };
     });
     Promise.all([lexiconPromise, feedPromise]).then(function (results) {
       var lexiconCards = results[0];
-      var feedCards = results[1];
+      var feedResult = results[1];
+      var feedCards = feedResult.cards || [];
+      var searchFailed = feedResult.searchFailed === true;
       loading.classList.add('hidden');
       var profilePromises = lexiconCards.map(function (c) { return getProfileByDid(c.did).then(function (p) { c.profile = p; return c; }); });
       Promise.all(profilePromises).then(function () {
@@ -1253,11 +1259,15 @@ fetch('config.json')
         });
         if (parts.length === 0) {
           var session = getStoredSession();
-          wrap.innerHTML = '<p class="muted">No forum posts from others yet. ' +
-            (session && session.accessJwt
-              ? 'Sync your own thread (use #blendsky-forum) to appear here; others who sync will show up in this list.'
-              : 'Connect your Bluesky account (Bluesky tab) to see forum posts from others. Sync your own thread to add #blendsky-forum.') +
-            ' Or paste an AT URI below to import a thread.</p>';
+          var needLogin = !session || !session.accessJwt;
+          var msg = needLogin && searchFailed
+            ? 'Connect your Bluesky account to see forum posts from other users. Use <strong>Log in</strong> (top right), then click <strong>Refresh</strong> below to load community posts.'
+            : needLogin
+              ? 'Connect your Bluesky account (Log in, top right) to see forum posts from other users. After connecting, click Refresh below.'
+              : 'No forum posts from others yet. Sync your own thread to Bluesky to appear here, or paste an AT URI below to import a thread.';
+          wrap.innerHTML = '<p class="muted forum-discover-empty">' + msg + '</p><p class="forum-discover-refresh-wrap"><button type="button" class="btn btn-ghost forum-discover-refresh" id="forum-discover-refresh">Refresh community posts</button></p>';
+          var refreshBtn = wrap.querySelector('#forum-discover-refresh');
+          if (refreshBtn) refreshBtn.addEventListener('click', function () { loadForumDiscover(); });
           return;
         }
         wrap.innerHTML = parts.join('');
@@ -1282,7 +1292,12 @@ fetch('config.json')
       });
     }).catch(function () {
       loading.classList.add('hidden');
-      wrap.innerHTML = '<p class="muted">See <a href="https://bsky.app/search?q=%23blendsky-forum" target="_blank" rel="noopener">#blendsky-forum on Bluesky</a> or paste an AT URI below to import.</p>';
+      var session = getStoredSession();
+      wrap.innerHTML = '<p class="muted forum-discover-empty">Could not load community posts. ' +
+        (session && session.accessJwt
+          ? 'Click <strong>Refresh</strong> above to try again, or <a href="https://bsky.app/search?q=%23blendsky-forum" target="_blank" rel="noopener">search #blendsky-forum on Bluesky</a>.'
+          : 'Connect your Bluesky account (Log in, top right) to see forum posts from other users, then click Refresh.') +
+        ' Or paste an AT URI below to import a thread.</p>';
     });
   }
 
@@ -1290,6 +1305,9 @@ fetch('config.json')
     renderThreadList();
     loadForumDiscover();
   }
+
+  var forumDiscoverRefreshBtn = document.getElementById('forum-discover-refresh-btn');
+  if (forumDiscoverRefreshBtn) forumDiscoverRefreshBtn.addEventListener('click', function () { loadForumDiscover(); });
 
   // ——— Bluesky (serverless: app password + PDS, or server: OAuth) ———
   function getStoredSession() {
@@ -1685,6 +1703,7 @@ fetch('config.json')
           connect.classList.add('hidden');
           feedWrap.classList.remove('hidden');
           userSpan.textContent = 'Connected as @' + (me.handle || me.did);
+          updateHeaderAuthState();
           feed.innerHTML = '<p class="muted">Loading your timeline…</p>';
           return loadBlueskyTimeline(null, false);
         })
@@ -1708,6 +1727,7 @@ fetch('config.json')
       connect.classList.add('hidden');
       feedWrap.classList.remove('hidden');
       userSpan.textContent = 'Connected as @' + session.handle;
+      updateHeaderAuthState();
       feed.innerHTML = '<p class="muted">Loading your timeline…</p>';
       loadBlueskyTimeline(null, false)
         .then(function () {})
@@ -1764,6 +1784,7 @@ fetch('config.json')
         document.getElementById('bluesky-connect').classList.add('hidden');
         document.getElementById('bluesky-feed-wrap').classList.remove('hidden');
         document.getElementById('bluesky-user').textContent = 'Connected as @' + (getStoredSession() && getStoredSession().handle);
+        updateHeaderAuthState();
         return loadBlueskyTimeline(null, false);
       })
       .then(function () {})
@@ -1783,6 +1804,7 @@ fetch('config.json')
         document.getElementById('bluesky-connect').classList.remove('hidden');
         document.getElementById('bluesky-feed-wrap').classList.add('hidden');
         document.getElementById('bluesky-handle').value = '';
+        updateHeaderAuthState();
         initBluesky();
       });
       return;
@@ -1792,6 +1814,7 @@ fetch('config.json')
     document.getElementById('bluesky-feed-wrap').classList.add('hidden');
     document.getElementById('bluesky-handle').value = '';
     if (document.getElementById('bluesky-app-password')) document.getElementById('bluesky-app-password').value = '';
+    updateHeaderAuthState();
     initBluesky();
   });
 
@@ -1812,6 +1835,28 @@ fetch('config.json')
       document.getElementById('bluesky-load-more').disabled = false;
     });
   });
+
+  /** Update header to show Log in vs Logged in as @handle (visible on every page). */
+  function updateHeaderAuthState() {
+    var loginWrap = document.getElementById('header-login-wrap');
+    var userWrap = document.getElementById('header-user-wrap');
+    var userLink = document.getElementById('header-user-link');
+    if (!loginWrap || !userWrap) return;
+    var session = getStoredSession();
+    if (session && session.handle) {
+      loginWrap.classList.add('hidden');
+      userWrap.classList.remove('hidden');
+      if (userLink) {
+        userLink.textContent = '@' + session.handle;
+        userLink.href = '#';
+      }
+    } else {
+      loginWrap.classList.remove('hidden');
+      userWrap.classList.add('hidden');
+    }
+  }
+
+  updateHeaderAuthState();
 
   // Start on home
   showView('home');

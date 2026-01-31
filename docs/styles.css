@@ -87,6 +87,20 @@ body {
   background: var(--accent-soft);
 }
 
+.header-auth-wrap {
+  margin-left: 0.5rem;
+}
+
+.header-user-label {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-right: 0.25rem;
+}
+
+.header-user-handle {
+  font-weight: 600;
+}
+
 /* Main */
 .main {
   flex: 1;
@@ -806,9 +820,30 @@ body {
   border: 1px solid var(--border);
 }
 
-.forum-discover h3 {
+.forum-discover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.forum-discover-header h3 {
+  margin: 0;
   font-size: 1.1rem;
-  margin: 0 0 0.5rem;
+}
+
+.forum-discover-refresh-btn {
+  flex-shrink: 0;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.forum-discover-refresh-wrap {
+  margin-top: 0.75rem;
 }
 
 .forum-discover-hint {
