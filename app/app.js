@@ -541,6 +541,24 @@ fetch('config.json')
     if (reqEdit) reqEdit.classList.toggle('hidden', !page.atUri);
     var suggestEdit = document.getElementById('wiki-suggest-edit');
     if (suggestEdit) suggestEdit.classList.toggle('hidden', !page.atUri);
+    var suggestedEditsSection = document.getElementById('wiki-suggested-edits');
+    if (suggestedEditsSection) {
+      suggestedEditsSection.classList.toggle('hidden', !page.atUri);
+      var suggestedList = document.getElementById('wiki-suggested-edits-list');
+      var suggestedEdits = page.suggestedEdits || [];
+      if (suggestedList) {
+        suggestedList.innerHTML = suggestedEdits.map(function (s) {
+          return '<li class="wiki-suggested-edit-item">' +
+            '<span class="author">' + escapeHtml(s.author || 'Anonymous') + '</span> ' +
+            '<span class="muted">' + (s.at ? new Date(s.at).toLocaleString() : '') + '</span>' +
+            '<div class="wiki-suggested-edit-text">' + bodyToHtml(s.text || '') + '</div></li>';
+        }).join('');
+      }
+      var suggestForm = document.getElementById('wiki-suggest-edit-form');
+      if (suggestForm) suggestForm.dataset.wikiSlug = slug;
+      var suggestBodyEl = document.getElementById('wiki-suggest-edit-body');
+      if (suggestBodyEl) suggestBodyEl.value = '';
+    }
     var replies = page.replies || [];
     var repliesList = document.getElementById('wiki-replies-list');
     if (repliesList) {
@@ -789,6 +807,7 @@ fetch('config.json')
       pages[newSlug].createdAt = now;
       pages[newSlug].history = [];
       pages[newSlug].replies = [];
+      pages[newSlug].suggestedEdits = [];
     }
     setWikiPages(pages);
     currentWikiSlug = newSlug;
@@ -856,9 +875,12 @@ fetch('config.json')
     var pages = getWikiPages();
     var page = pages[currentWikiSlug];
     if (!page || !page.atUri) return;
-    var text = 'Requesting edit access to “' + (page.title || 'Untitled') + '”: ' + page.atUri;
-    var url = 'https://bsky.app/intent/compose?text=' + encodeURIComponent(text);
-    window.open(url, '_blank', 'noopener');
+    if (!page.replies) page.replies = [];
+    var session = getStoredSession();
+    var author = (session && session.handle) ? '@' + session.handle : 'You';
+    page.replies.push({ author: author, text: 'Requested edit access to this article.' });
+    setWikiPages(pages);
+    openWikiPage(currentWikiSlug);
   });
 
   document.getElementById('wiki-remix').addEventListener('click', function () {
@@ -871,7 +893,7 @@ fetch('config.json')
     var newSlug = slugify(newTitle);
     var body = page.body || '';
     if (page.atUri) body = 'Remixed from: ' + page.atUri + '\n\n' + body;
-    var newPage = { title: newTitle, body: body, version: 0.1, replies: [] };
+    var newPage = { title: newTitle, body: body, version: 0.1, replies: [], suggestedEdits: [] };
     if (page.atUri) newPage.remixedFrom = page.atUri;
     pages[newSlug] = newPage;
     setWikiPages(pages);
@@ -885,13 +907,38 @@ fetch('config.json')
 
   document.getElementById('wiki-suggest-edit').addEventListener('click', function () {
     if (!currentWikiSlug) return;
+    var section = document.getElementById('wiki-suggested-edits');
+    var form = document.getElementById('wiki-suggest-edit-form');
+    var bodyEl = document.getElementById('wiki-suggest-edit-body');
+    if (section) section.classList.remove('hidden');
+    if (form) form.classList.remove('hidden');
+    if (bodyEl) { bodyEl.value = ''; bodyEl.focus(); }
+  });
+
+  document.getElementById('wiki-suggest-edit-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var slug = this.dataset.wikiSlug;
+    if (!slug) return;
+    var text = document.getElementById('wiki-suggest-edit-body').value.trim();
+    if (!text) return;
     var pages = getWikiPages();
-    var page = pages[currentWikiSlug];
-    if (!page || !page.atUri) return;
-    var title = page.title || 'Untitled';
-    var text = 'I suggested an edit to your wiki article "' + title + '". Link: ' + page.atUri + ' — Paste your suggested change below.';
-    var url = 'https://bsky.app/intent/compose?text=' + encodeURIComponent(text);
-    window.open(url, '_blank', 'noopener');
+    var page = pages[slug];
+    if (!page) return;
+    if (!page.suggestedEdits) page.suggestedEdits = [];
+    var session = getStoredSession();
+    var author = (session && session.handle) ? '@' + session.handle : 'You';
+    page.suggestedEdits.push({ author: author, text: text, at: new Date().toISOString() });
+    setWikiPages(pages);
+    openWikiPage(slug);
+    var form = document.getElementById('wiki-suggest-edit-form');
+    if (form) form.classList.add('hidden');
+  });
+
+  document.getElementById('wiki-suggest-edit-cancel').addEventListener('click', function () {
+    var form = document.getElementById('wiki-suggest-edit-form');
+    if (form) form.classList.add('hidden');
+    var bodyEl = document.getElementById('wiki-suggest-edit-body');
+    if (bodyEl) bodyEl.value = '';
   });
 
   document.getElementById('wiki-reply-form').addEventListener('submit', function (e) {
@@ -1116,7 +1163,6 @@ fetch('config.json')
         '<p class="sync-status sync-synced">From Bluesky</p>' +
         '<div class="forum-op-label">Post</div>' +
         '<div class="forum-reply forum-op text forum-body-html">' + simpleMarkdown(text) + '</div>' +
-        '<p class="forum-view-on-bluesky forum-guest-actions"><a href="' + escapeHtml(postUrl) + '" target="_blank" rel="noopener" class="btn btn-secondary">View on Bluesky</a></p>' +
       '</div></div>';
     document.getElementById('forum-thread-detail').innerHTML = body;
     document.getElementById('forum-replies-list').innerHTML = '';
@@ -1169,11 +1215,7 @@ fetch('config.json')
     }
     body += '<div class="forum-op-label">Original post</div><div class="forum-reply forum-op text forum-body-html">' + bodyToHtml(thread.body || '') + '</div>';
     if (thread.atUri) {
-      body += '<p class="forum-at-uri muted"><small>Document: <a href="' + escapeHtml(thread.atUri) + '" target="_blank" rel="noopener">' + escapeHtml(thread.atUri) + '</a></small></p>';
-    }
-    var replyPostUrl = thread.feedPostUri ? feedPostUriToBskyUrl(thread.feedPostUri) : null;
-    if (replyPostUrl) {
-      body += '<p class="forum-view-on-bluesky muted"><small><a href="' + escapeHtml(replyPostUrl) + '" target="_blank" rel="noopener">View on Bluesky</a></small></p>';
+      body += '<p class="forum-at-uri muted"><small>Document: ' + escapeHtml(thread.atUri) + '</small></p>';
     }
     body += '</div></div>';
     detail.innerHTML = body;
@@ -1558,8 +1600,7 @@ fetch('config.json')
     var titleEl = document.getElementById('post-viewer-title');
     var bylineEl = overlay && overlay.querySelector('.post-viewer-byline');
     var bodyEl = document.getElementById('post-viewer-body');
-    var linkEl = document.getElementById('post-viewer-bsky-link');
-    if (!overlay || !titleEl || !bodyEl || !linkEl) return;
+    if (!overlay || !titleEl || !bodyEl) return;
     var text = (data && data.fullText) ? String(data.fullText) : '';
     var firstLine = text.split('\n')[0] || text;
     var title = firstLine.length > 80 ? firstLine.slice(0, 77) + '…' : firstLine || 'Thread';
@@ -1568,8 +1609,6 @@ fetch('config.json')
     titleEl.textContent = title;
     if (bylineEl) bylineEl.textContent = 'By @' + (displayName || handle);
     bodyEl.innerHTML = simpleMarkdown(text);
-    linkEl.href = (data && data.postUri) ? data.postUri : '#';
-    linkEl.classList.toggle('hidden', !(data && data.postUri));
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden', 'false');
     var closeBtn = document.getElementById('post-viewer-close');
@@ -1684,7 +1723,8 @@ fetch('config.json')
         atUri: uri,
         createdBy: imported.createdBy || author || 'AT Protocol',
         version: 0.1,
-        replies: []
+        replies: [],
+        suggestedEdits: []
       };
       setWikiPages(pages);
       renderWikiList();

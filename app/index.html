@@ -98,7 +98,7 @@
             <h1 id="wiki-title"></h1>
             <p id="wiki-sync-status" class="sync-status" aria-live="polite"></p>
             <p id="wiki-byline" class="wiki-byline muted" aria-live="polite"></p>
-            <p class="wiki-edits-hint muted"><small>Edits sync to Bluesky. Remix creates a fork. Suggest edit sends your change to the author via Bluesky.</small></p>
+            <p class="wiki-edits-hint muted"><small>Remix creates a fork. Suggest edit adds your proposed change below for the author to see.</small></p>
             <div id="wiki-body" class="wiki-body"></div>
             <div class="wiki-view-actions">
               <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
@@ -108,6 +108,16 @@
               <button type="button" id="wiki-remix" class="btn btn-secondary">Remix</button>
               <button type="button" id="wiki-history-btn" class="btn btn-ghost">History</button>
             </div>
+            <section id="wiki-suggested-edits" class="wiki-suggested-edits hidden">
+              <h3>Suggested edits</h3>
+              <p class="wiki-suggested-edits-hint muted"><small>Propose a change for the author. It will appear here.</small></p>
+              <ul id="wiki-suggested-edits-list" class="wiki-suggested-edits-list"></ul>
+              <form id="wiki-suggest-edit-form" class="wiki-suggest-edit-form hidden">
+                <textarea id="wiki-suggest-edit-body" placeholder="Describe or paste your suggested change…" rows="4"></textarea>
+                <button type="submit" class="btn btn-primary">Submit suggestion</button>
+                <button type="button" id="wiki-suggest-edit-cancel" class="btn btn-ghost">Cancel</button>
+              </form>
+            </section>
             <section class="wiki-discussion">
               <h3>Discussion</h3>
               <p class="wiki-discussion-hint muted"><small>Reply to this article. Quote a reply to reference it.</small></p>
@@ -145,7 +155,7 @@
           <h3>Wiki articles from others</h3>
           <button type="button" id="wiki-from-others-refresh" class="btn btn-ghost btn-sm" title="Reload articles from everyone">Refresh</button>
         </div>
-        <p class="wiki-from-others-hint muted">Articles from others who synced to Bluesky from <strong>this app URL</strong> (Standard.site). Click a card or <strong>Open in Wiki</strong> to view, reply in Discussion, edit your copy, or <strong>Suggest edit</strong> to send changes to the author. Use <strong>Remix</strong> to fork and adapt. Sync your pages so others can see and collaborate.</p>
+        <p class="wiki-from-others-hint muted">Articles from others who synced to Bluesky from <strong>this app URL</strong> (Standard.site). Click a card or <strong>Open in Wiki</strong> to view, reply in Discussion, edit your copy, or <strong>Suggest edit</strong> to add your proposed change below. Use <strong>Remix</strong> to fork and adapt. Sync your pages so others can see and collaborate.</p>
         <div id="wiki-from-others-feed" class="wiki-from-others-feed"><p class="muted" id="wiki-from-others-loading">Loading…</p></div>
       </div>
     </section>
@@ -298,9 +308,6 @@
         <button type="button" class="post-viewer-close btn btn-ghost" id="post-viewer-close" aria-label="Close">Done</button>
       </div>
       <div id="post-viewer-body" class="post-viewer-body"></div>
-      <div class="post-viewer-actions">
-        <a href="#" id="post-viewer-bsky-link" class="btn btn-secondary" target="_blank" rel="noopener">View on Bluesky</a>
-      </div>
     </div>
   </div>
 

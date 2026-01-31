@@ -968,6 +968,66 @@ body {
   resize: vertical;
 }
 
+.wiki-suggested-edits {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.wiki-suggested-edits h3 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.wiki-suggested-edits-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.wiki-suggested-edits-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+
+.wiki-suggested-edit-item {
+  padding: 1rem 1.25rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+  border-left: 3px solid var(--accent);
+  margin-left: 0.5rem;
+}
+
+.wiki-suggested-edit-item .author {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.wiki-suggested-edit-text {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.wiki-suggest-edit-form {
+  margin-top: 0.5rem;
+}
+
+.wiki-suggest-edit-form textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  margin-bottom: 0.5rem;
+  resize: vertical;
+}
+
+.wiki-suggest-edit-form .btn {
+  margin-right: 0.5rem;
+}
+
 .wiki-from-others {
   margin-top: 2rem;
   padding-top: 1.5rem;
