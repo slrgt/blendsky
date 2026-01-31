@@ -1056,6 +1056,15 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.wiki-from-others-top {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
 .wiki-from-others-header {
   display: flex;
   align-items: center;

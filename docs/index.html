@@ -80,6 +80,14 @@
 
     <!-- Wiki (Wikipedia-style) -->
     <section id="view-wiki" class="view view-wiki">
+      <div id="wiki-from-others" class="wiki-from-others wiki-from-others-top">
+        <div class="wiki-from-others-header">
+          <h3>Wiki articles from others</h3>
+          <button type="button" id="wiki-from-others-refresh" class="btn btn-ghost btn-sm" title="Reload articles from everyone">Refresh</button>
+        </div>
+        <p class="wiki-from-others-hint muted">Most recent articles from everyone using this wiki (Standard.site). Click a card or <strong>Open in Wiki</strong> to view, reply, or <strong>Remix</strong> to fork.</p>
+        <div id="wiki-from-others-feed" class="wiki-from-others-feed"><p class="muted" id="wiki-from-others-loading">Loading…</p></div>
+      </div>
       <div class="wiki-toolbar wiki-toolbar-wikipedia">
         <div class="wiki-toolbar-inner">
           <input type="text" id="wiki-search" class="wiki-search" placeholder="Search or create page…" />
@@ -147,14 +155,6 @@
             </div>
           </div>
         </article>
-      </div>
-      <div id="wiki-from-others" class="wiki-from-others">
-        <div class="wiki-from-others-header">
-          <h3>Wiki articles from others</h3>
-          <button type="button" id="wiki-from-others-refresh" class="btn btn-ghost btn-sm" title="Reload articles from everyone">Refresh</button>
-        </div>
-        <p class="wiki-from-others-hint muted">Articles from others who synced to Bluesky from <strong>this app URL</strong> (Standard.site). Click a card or <strong>Open in Wiki</strong> to view, reply in Discussion, edit your copy, or <strong>Suggest edit</strong> to add your proposed change below. Use <strong>Remix</strong> to fork and adapt. Sync your pages so others can see and collaborate.</p>
-        <div id="wiki-from-others-feed" class="wiki-from-others-feed"><p class="muted" id="wiki-from-others-loading">Loading…</p></div>
       </div>
     </section>
 

@@ -662,8 +662,8 @@ fetch('config.json')
     var wrap = document.getElementById('wiki-from-others-feed');
     var loading = document.getElementById('wiki-from-others-loading');
     if (!wrap || !loading) return;
-    var constellationPromise = fetchConstellationLinks(window.location.origin, 'site.standard.document', '.site', 40).then(function (links) {
-      return Promise.all(links.slice(0, 25).map(function (l) {
+    var constellationPromise = fetchConstellationLinks(window.location.origin, 'site.standard.document', '.site', 60).then(function (links) {
+      return Promise.all(links.slice(0, 50).map(function (l) {
         return fetchAtRecord(l.uri).then(function (data) {
           var record = data.value || data.record;
           var path = (record && record.path) ? String(record.path) : '';
@@ -677,7 +677,7 @@ fetch('config.json')
         }).catch(function () { return null; });
       })).then(function (arr) { return arr.filter(Boolean); });
     }).catch(function () { return []; });
-    var wikiSearchPromise = searchPostsBluesky('#blendsky-wiki', 25).then(function (data) {
+    var wikiSearchPromise = searchPostsBluesky('#blendsky-wiki', 50).then(function (data) {
       var posts = (data && data.posts) || (data && data.feed) || (data && data.result && data.result.posts) || (Array.isArray(data) ? data : []);
       if (!Array.isArray(posts)) posts = [];
       return posts.map(function (p) {
