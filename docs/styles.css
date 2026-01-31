@@ -2196,6 +2196,46 @@ body {
   margin-bottom: 1rem;
 }
 
+/* Reply form: always visible and usable when .forum-replies is shown */
+#view-forum .forum-replies:not(.hidden) {
+  display: block;
+}
+
+#view-forum .forum-reply-form {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  background: var(--f-surface);
+  border: 1px solid var(--f-border);
+  border-radius: var(--f-radius);
+}
+
+#view-forum .forum-reply-form textarea {
+  border: 1px solid var(--f-border);
+  border-radius: var(--f-radius);
+  padding: 0.75rem;
+  font-size: 0.95rem;
+  min-height: 100px;
+  margin-bottom: 0.75rem;
+}
+
+#view-forum .forum-reply-form .form-actions-inline {
+  margin-bottom: 0.75rem;
+}
+
+#view-forum .forum-reply-form .btn-primary {
+  background: var(--f-text);
+  color: var(--f-surface);
+  margin-top: 0.25rem;
+}
+
+#view-forum .forum-reply-form .btn-primary:hover {
+  filter: brightness(0.9);
+}
+
+#view-forum .forum-reply-form .forum-upload-label {
+  font-size: 0.875rem;
+}
+
 #view-forum .forum-reply-item {
   background: var(--f-surface);
   border: 1px solid var(--f-border);
@@ -2210,6 +2250,7 @@ body {
   font-weight: 600;
 }
 
+<<<<<<< Updated upstream
 #view-forum .forum-reply-form textarea {
   border: 1px solid var(--f-border);
   border-radius: var(--f-radius);
@@ -2218,6 +2259,8 @@ body {
 }
 
 /* New / Edit views: minimal form */
+=======
+>>>>>>> Stashed changes
 #view-forum #forum-new-view,
 #view-forum #forum-edit-view {
   padding: 1rem 0;
