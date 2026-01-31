@@ -89,6 +89,7 @@
           <div id="wiki-view" class="wiki-view">
             <h1 id="wiki-title"></h1>
             <p id="wiki-sync-status" class="sync-status" aria-live="polite"></p>
+            <p id="wiki-byline" class="wiki-byline muted" aria-live="polite"></p>
             <p class="wiki-edits-hint muted"><small>Edits sync to Bluesky. Remix creates a fork. Request edit opens Bluesky compose.</small></p>
             <div id="wiki-body" class="wiki-body"></div>
             <div class="wiki-view-actions">
@@ -96,6 +97,19 @@
               <button type="button" id="wiki-sync-bluesky" class="btn btn-secondary">Sync to Bluesky</button>
               <button type="button" id="wiki-request-edit" class="btn btn-ghost hidden">Request edit</button>
               <button type="button" id="wiki-remix" class="btn btn-secondary">Remix</button>
+              <button type="button" id="wiki-history-btn" class="btn btn-ghost">History</button>
+            </div>
+          </div>
+          <div id="wiki-history-panel" class="wiki-history-panel hidden">
+            <div class="wiki-history-header">
+              <h3>Edit history</h3>
+              <label class="wiki-diff-pref"><input type="checkbox" id="wiki-diff-colorblind" /> Colorblind-friendly</label>
+              <button type="button" id="wiki-history-close" class="btn btn-ghost">Close</button>
+            </div>
+            <ul id="wiki-history-list" class="wiki-history-list"></ul>
+            <div id="wiki-diff-view" class="wiki-diff-view hidden">
+              <h4 id="wiki-diff-title" class="wiki-diff-title"></h4>
+              <div id="wiki-diff-body" class="wiki-diff-body"></div>
             </div>
           </div>
           <div id="wiki-edit" class="wiki-edit hidden">
@@ -127,7 +141,7 @@
           <h3>Community forum</h3>
           <button type="button" id="forum-discover-refresh-btn" class="btn btn-ghost btn-sm forum-discover-refresh-btn" title="Reload threads from everyone">Refresh</button>
         </div>
-        <p class="forum-discover-hint muted">Threads from everyone who syncs to Bluesky. Open a thread to read and reply; use <strong>Remix</strong> to copy a tutorial and adapt it as your own.</p>
+        <p class="forum-discover-hint muted">Threads from everyone who syncs to Bluesky from <strong>this app URL</strong>. Click a thread to open it (it will be added to your list). Use <strong>Remix</strong> to copy and adapt. If you don’t see others’ threads: sync your own with <strong>Sync to Bluesky</strong>, then click <strong>Refresh</strong>; others using the same URL will see yours too.</p>
         <div id="forum-discover-feed" class="forum-discover-feed"><p class="muted" id="forum-discover-loading">Loading…</p></div>
       </div>
       <h3 class="forum-your-threads-title">My threads</h3>

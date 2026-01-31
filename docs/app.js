@@ -403,6 +403,47 @@ fetch('config.json')
     return div.innerHTML;
   }
 
+  /** Line diff (LCS). Returns [{ type: 'same'|'add'|'del', line }]. */
+  function lineDiff(oldStr, newStr) {
+    var o = (oldStr || '').split('\n');
+    var n = (newStr || '').split('\n');
+    var R = o.length, C = n.length;
+    var dp = [];
+    for (var r = 0; r <= R; r++) {
+      dp[r] = [];
+      for (var c = 0; c <= C; c++) dp[r][c] = 0;
+    }
+    for (var i = 1; i <= R; i++) {
+      for (var j = 1; j <= C; j++) {
+        if (o[i - 1] === n[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+        else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+    var out = [];
+    var i = R, j = C;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && o[i - 1] === n[j - 1]) {
+        out.unshift({ type: 'same', line: o[i - 1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        out.unshift({ type: 'add', line: n[j - 1] });
+        j--;
+      } else if (i > 0) {
+        out.unshift({ type: 'del', line: o[i - 1] });
+        i--;
+      }
+    }
+    return out;
+  }
+
+  var STORAGE_DIFF_COLORBLIND = 'blendsky_diff_colorblind';
+  function getDiffColorblind() {
+    try { return localStorage.getItem(STORAGE_DIFF_COLORBLIND) === '1'; } catch (_) { return false; }
+  }
+  function setDiffColorblind(v) {
+    try { localStorage.setItem(STORAGE_DIFF_COLORBLIND, v ? '1' : ''); } catch (_) {}
+  }
+
   function openWikiPage(slug) {
     const pages = getWikiPages();
     const page = pages[slug];
@@ -414,6 +455,16 @@ fetch('config.json')
       bodyHtml = '<p class="wiki-remixed-from muted"><small>Remixed from: <a href="' + escapeHtml(page.remixedFrom) + '" target="_blank" rel="noopener">' + escapeHtml(page.remixedFrom) + '</a></small></p>' + bodyHtml;
     }
     document.getElementById('wiki-body').innerHTML = bodyHtml;
+    var bylineEl = document.getElementById('wiki-byline');
+    if (bylineEl) {
+      var createdBy = page.createdBy || 'Local';
+      var updatedBy = page.updatedBy || page.createdBy || 'Local';
+      var updatedAt = page.updatedAt || page.createdAt;
+      var parts = ['By ' + escapeHtml(createdBy)];
+      if (updatedAt) parts.push('Last edited by ' + escapeHtml(updatedBy) + ' at ' + new Date(updatedAt).toLocaleString());
+      bylineEl.textContent = parts.join(' · ');
+      bylineEl.style.display = parts.length ? 'block' : 'none';
+    }
     document.getElementById('wiki-view').classList.remove('hidden');
     document.getElementById('wiki-edit').classList.add('hidden');
     updateWikiStatus(slug);
@@ -582,10 +633,23 @@ fetch('config.json')
     const newSlug = slugify(title);
     if (currentWikiSlug && currentWikiSlug !== newSlug) delete pages[currentWikiSlug];
     var existing = currentWikiSlug && pages[currentWikiSlug] ? pages[currentWikiSlug] : null;
-    pages[newSlug] = { title: title, body: body };
+    var session = getStoredSession();
+    var by = (session && session.handle) ? '@' + session.handle : 'Local';
+    var now = new Date().toISOString();
+    pages[newSlug] = { title: title, body: body, updatedBy: by, updatedAt: now };
     if (existing) {
       if (existing.atUri) pages[newSlug].atUri = existing.atUri;
       if (existing.remixedFrom) pages[newSlug].remixedFrom = existing.remixedFrom;
+      if (existing.createdBy) pages[newSlug].createdBy = existing.createdBy;
+      if (existing.createdAt) pages[newSlug].createdAt = existing.createdAt;
+      var history = Array.isArray(existing.history) ? existing.history.slice() : [];
+      history.push({ body: existing.body || '', title: existing.title, by: by, at: now });
+      if (history.length > 50) history = history.slice(-50);
+      pages[newSlug].history = history;
+    } else {
+      pages[newSlug].createdBy = by;
+      pages[newSlug].createdAt = now;
+      pages[newSlug].history = [];
     }
     setWikiPages(pages);
     currentWikiSlug = newSlug;
@@ -679,6 +743,72 @@ fetch('config.json')
     document.getElementById('wiki-view').classList.add('hidden');
     document.getElementById('wiki-edit').classList.remove('hidden');
   });
+
+  (function () {
+    var historyPanel = document.getElementById('wiki-history-panel');
+    var historyList = document.getElementById('wiki-history-list');
+    var diffView = document.getElementById('wiki-diff-view');
+    var diffTitle = document.getElementById('wiki-diff-title');
+    var diffBody = document.getElementById('wiki-diff-body');
+    var colorblindCb = document.getElementById('wiki-diff-colorblind');
+    if (colorblindCb) {
+      colorblindCb.checked = getDiffColorblind();
+      colorblindCb.addEventListener('change', function () {
+        setDiffColorblind(colorblindCb.checked);
+        if (diffView && !diffView.classList.contains('hidden') && currentWikiSlug) renderWikiDiff(currentWikiSlug, diffView.dataset.oldBody || '', diffView.dataset.newBody || '');
+      });
+    }
+    function renderWikiDiff(slug, oldBody, newBody) {
+      if (!diffBody) return;
+      var cb = getDiffColorblind();
+      var addCls = cb ? 'diff-add-cb' : 'diff-add';
+      var delCls = cb ? 'diff-del-cb' : 'diff-del';
+      var chunks = lineDiff(oldBody, newBody);
+      diffBody.innerHTML = chunks.map(function (c) {
+        var cls = c.type === 'add' ? addCls : c.type === 'del' ? delCls : '';
+        var prefix = c.type === 'add' ? '+ ' : c.type === 'del' ? '- ' : '  ';
+        return '<div class="' + (cls || '') + '">' + escapeHtml(prefix + (c.line || '')) + '</div>';
+      }).join('');
+      if (diffView) {
+        diffView.dataset.oldBody = oldBody;
+        diffView.dataset.newBody = newBody;
+      }
+    }
+    document.getElementById('wiki-history-btn').addEventListener('click', function () {
+      if (!currentWikiSlug) return;
+      var pages = getWikiPages();
+      var page = pages[currentWikiSlug];
+      if (!page) return;
+      var history = Array.isArray(page.history) ? page.history.slice() : [];
+      history.reverse();
+      historyList.innerHTML = '';
+      if (history.length === 0) {
+        historyList.innerHTML = '<li class="muted">No edit history yet. Edits are recorded when you save.</li>';
+      } else {
+        var currentBody = (page.body || '') || '';
+        history.forEach(function (h, idx) {
+          var li = document.createElement('li');
+          li.className = 'wiki-history-item';
+          li.innerHTML = 'Edit by ' + escapeHtml(h.by || '?') + ' at ' + new Date(h.at || 0).toLocaleString();
+          var oldB = (h.body || '') || '';
+          var newB = (idx === 0 ? currentBody : (history[idx - 1].body || '')) || '';
+          li.dataset.oldBody = oldB;
+          li.dataset.newBody = newB;
+          li.addEventListener('click', function () {
+            diffTitle.textContent = 'Change by ' + (h.by || '?') + ' at ' + new Date(h.at || 0).toLocaleString();
+            renderWikiDiff(currentWikiSlug, oldB, newB);
+            diffView.classList.remove('hidden');
+          });
+          historyList.appendChild(li);
+        });
+      }
+      diffView.classList.add('hidden');
+      historyPanel.classList.remove('hidden');
+    });
+    document.getElementById('wiki-history-close').addEventListener('click', function () {
+      historyPanel.classList.add('hidden');
+    });
+  })();
 
   document.getElementById('wiki-search').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') {
@@ -1260,8 +1390,11 @@ fetch('config.json')
   });
 
   /** Fetch DIDs that link to target (e.g. site.standard.document records). Returns Promise<{ uri, did }[]>. */
+  /** When target is an HTTP(S) origin, use path .site so Constellation returns records whose .site field equals that origin. */
   function fetchConstellationLinks(targetOrigin, collection, path, limit) {
-    var url = CONSTELLATION_BASE + '/links?target=' + encodeURIComponent(targetOrigin) + '&collection=' + encodeURIComponent(collection || 'site.standard.document') + '&path=' + encodeURIComponent(path || '.path') + '&limit=' + (limit || 30);
+    var isOrigin = targetOrigin && (targetOrigin.indexOf('http://') === 0 || targetOrigin.indexOf('https://') === 0);
+    var pathParam = (path && path !== '.path') ? path : (isOrigin ? '.site' : '.path');
+    var url = CONSTELLATION_BASE + '/links?target=' + encodeURIComponent(targetOrigin) + '&collection=' + encodeURIComponent(collection || 'site.standard.document') + '&path=' + encodeURIComponent(pathParam) + '&limit=' + (limit || 30);
     return fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'blendsky/1.0' } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -1388,10 +1521,10 @@ fetch('config.json')
           var session = getStoredSession();
           var needLogin = !session || !session.accessJwt;
           var msg = needLogin && searchFailed
-            ? 'Connect your Bluesky account to see forum posts from other users. Use <strong>Log in</strong> (top right), then click <strong>Refresh</strong> below to load community posts.'
+            ? 'Connect your Bluesky account (Log in, top right), then click <strong>Refresh</strong> to load forum posts from others who use this app URL.'
             : needLogin
-              ? 'Connect your Bluesky account (Log in, top right) to see forum posts from other users. After connecting, click Refresh below.'
-              : 'No forum posts from others yet. Sync your thread to Bluesky (Standard.site <code>site.standard.document</code>). Or paste an AT URI below to import a thread.';
+              ? 'Connect your Bluesky account (Log in, top right), then click Refresh. You’ll see threads from everyone who syncs from this same app URL.'
+              : 'No threads from others yet. Create a thread under <strong>My threads</strong>, then use <strong>Sync to Bluesky</strong> on it. Others visiting this same app URL will see it in Community forum after they click Refresh. Or paste an AT URI below to import a thread.';
           wrap.innerHTML = '<p class="muted forum-discover-empty">' + msg + '</p><p class="forum-discover-refresh-wrap"><button type="button" class="btn btn-ghost forum-discover-refresh" id="forum-discover-refresh">Refresh community posts</button></p>';
           var refreshBtn = wrap.querySelector('#forum-discover-refresh');
           if (refreshBtn) refreshBtn.addEventListener('click', function () { loadForumDiscover(); });

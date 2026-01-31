@@ -9,29 +9,33 @@
 
   const NS_DOCUMENT = 'site.standard.document';
 
-  /** site.standard.document record for a wiki page. path: /wiki/slug */
+  /** site.standard.document record for a wiki page. path: /wiki/slug. site: app origin so Constellation can index by target. */
   function documentFromWikiPage(page, slug, baseUrl) {
     var path = '/wiki/' + (slug || 'untitled').replace(/^\//, '').replace(/^wiki\/?/, '');
     if (path === '/wiki/') path = '/wiki/untitled';
-    return {
+    var doc = {
       $type: NS_DOCUMENT,
       path: path,
       title: page.title || 'Untitled',
       content: page.body || ''
     };
+    if (baseUrl && (baseUrl.indexOf('http://') === 0 || baseUrl.indexOf('https://') === 0)) doc.site = baseUrl.replace(/\/$/, '');
+    return doc;
   }
 
-  /** site.standard.document record for a forum thread. path: /forum/threadPath */
+  /** site.standard.document record for a forum thread. path: /forum/threadPath. site: app origin for Constellation. */
   function documentFromThread(thread, baseUrl) {
     var pathSeg = (thread.path && thread.path.replace(/^\//, '')) || ('thread-' + thread.id);
     var path = '/forum/' + pathSeg;
     var content = (thread.description ? thread.description + '\n\n' : '') + (thread.body || '');
-    return {
+    var doc = {
       $type: NS_DOCUMENT,
       path: path,
       title: thread.title || 'Untitled',
       content: content.trim() || '(No content)'
     };
+    if (baseUrl && (baseUrl.indexOf('http://') === 0 || baseUrl.indexOf('https://') === 0)) doc.site = baseUrl.replace(/\/$/, '');
+    return doc;
   }
 
   /** Normalize forum thread to document shape (for export). */
