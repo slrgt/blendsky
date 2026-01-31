@@ -807,6 +807,7 @@ fetch('config.json')
       pages[newSlug].createdAt = now;
       pages[newSlug].history = [];
       pages[newSlug].replies = [];
+      pages[newSlug].suggestedEdits = [];
     }
     setWikiPages(pages);
     currentWikiSlug = newSlug;
@@ -1599,8 +1600,7 @@ fetch('config.json')
     var titleEl = document.getElementById('post-viewer-title');
     var bylineEl = overlay && overlay.querySelector('.post-viewer-byline');
     var bodyEl = document.getElementById('post-viewer-body');
-    var linkEl = document.getElementById('post-viewer-bsky-link');
-    if (!overlay || !titleEl || !bodyEl || !linkEl) return;
+    if (!overlay || !titleEl || !bodyEl) return;
     var text = (data && data.fullText) ? String(data.fullText) : '';
     var firstLine = text.split('\n')[0] || text;
     var title = firstLine.length > 80 ? firstLine.slice(0, 77) + '…' : firstLine || 'Thread';
@@ -1609,8 +1609,6 @@ fetch('config.json')
     titleEl.textContent = title;
     if (bylineEl) bylineEl.textContent = 'By @' + (displayName || handle);
     bodyEl.innerHTML = simpleMarkdown(text);
-    linkEl.href = (data && data.postUri) ? data.postUri : '#';
-    linkEl.classList.toggle('hidden', !(data && data.postUri));
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden', 'false');
     var closeBtn = document.getElementById('post-viewer-close');
