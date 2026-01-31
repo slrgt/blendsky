@@ -1,23 +1,21 @@
 /**
- * standard.site lexicons compatibility
- * Schema aligned with https://tangled.org/standard.site/lexicons
- * (site.standard.document, site.standard.publication)
- * Compatible with [atcute](https://tangled.org/mary.my.id/atcute) (@atcute/standard-site, @atcute/pckt),
- * pckt.blog, Leaflet, Offprint, and other standard.site / atcute-based apps.
+ * blendsky lexicon — one document type for forum posts and wiki articles on the AT Protocol.
+ * NSID: app.blendsky.document
+ * Used for forums and wikis published from this app; discoverable by collection on the AT Protocol.
  */
 
 (function (global) {
   'use strict';
 
-  const NS_DOCUMENT = 'site.standard.document';
-  const NS_PUBLICATION = 'site.standard.publication';
+  const NS_DOCUMENT = 'app.blendsky.document';
 
-  /** site.standard.document record shape for a wiki page (same lexicon as threads/posts). forkOf for remix/tangled compatibility. */
+  /** app.blendsky.document record shape for a wiki page. kind: 'wiki'. */
   function documentFromWikiPage(page, slug, baseUrl) {
     const now = new Date().toISOString();
     const body = page.body || '';
     const doc = {
       $type: NS_DOCUMENT,
+      kind: 'wiki',
       site: baseUrl || (typeof location !== 'undefined' ? location.origin : ''),
       path: '/' + (slug || 'untitled').replace(/^\//, ''),
       title: page.title || 'Untitled',
@@ -32,10 +30,12 @@
     return doc;
   }
 
-  /** site.standard.document record shape (metadata for a post/article) */
+  /** app.blendsky.document record shape for a forum thread. kind: 'forum'. */
   function documentFromThread(thread, baseUrl) {
     const now = new Date().toISOString();
     return {
+      $type: NS_DOCUMENT,
+      kind: 'forum',
       site: baseUrl || (typeof location !== 'undefined' ? location.origin : ''),
       path: thread.path ? '/' + thread.path.replace(/^\//, '') : '/thread/' + thread.id,
       title: thread.title || 'Untitled',
@@ -44,17 +44,17 @@
       tags: Array.isArray(thread.tags) ? thread.tags : [],
       publishedAt: thread.publishedAt || thread.createdAt || now,
       updatedAt: thread.updatedAt || thread.publishedAt || thread.createdAt || now,
+      content: thread.body || '',
       bskyPostRef: thread.bskyPostRef || undefined
     };
   }
 
-  /** Normalize forum thread to include standard.site document fields */
+  /** Normalize forum thread to full document shape (for export). */
   function threadToDocumentShape(thread, baseUrl) {
     const doc = documentFromThread(thread, baseUrl);
     return {
       $type: NS_DOCUMENT,
       ...doc,
-      content: thread.body,
       id: thread.id,
       author: thread.author,
       replies: thread.replies
@@ -72,7 +72,7 @@
     return 'at://' + repo + '/' + collection + '/' + rkey;
   }
 
-  /** Convert fetched AT record (site.standard.document) into a forum thread for display */
+  /** Convert fetched AT record (app.blendsky.document) into a forum thread for display */
   function recordToThread(record, uri, author) {
     if (!record || typeof record !== 'object') return null;
     const title = record.title || 'Untitled';
@@ -95,9 +95,8 @@
     };
   }
 
-  global.StandardSite = {
+  global.BlendskyLexicon = {
     NS_DOCUMENT: NS_DOCUMENT,
-    NS_PUBLICATION: NS_PUBLICATION,
     documentFromWikiPage: documentFromWikiPage,
     documentFromThread: documentFromThread,
     threadToDocumentShape: threadToDocumentShape,
