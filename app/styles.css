@@ -177,6 +177,73 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+/* Two-column home: Recent (wiki/forum) | From Bluesky (#b3d) */
+.home-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .home-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-recent-col,
+.home-bluesky-col {
+  padding: 1.25rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.home-col-title {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  color: var(--text);
+}
+
+.home-col-desc {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.home-recent-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.home-recent-item {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.home-recent-item:hover {
+  border-color: var(--border);
+  background: var(--bg-elevated);
+}
+
+.home-recent-type {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-right: 0.5rem;
+}
+
 .trending-header {
   margin-bottom: 0.75rem;
 }
@@ -656,6 +723,62 @@ body {
   font-family: inherit;
   margin-bottom: 0.5rem;
   resize: vertical;
+}
+
+/* Form labels and hints (forum new/edit) */
+.form-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0 0 0.35rem;
+  color: var(--text);
+}
+
+.form-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.form-optional {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.form-optional summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.form-label-optional {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.form-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.form-input-optional {
+  margin-bottom: 0.75rem;
 }
 
 .forum-new-form input,
