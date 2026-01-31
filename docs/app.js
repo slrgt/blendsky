@@ -18,6 +18,7 @@ fetch('config.json')
   var STORAGE_BSKY = 'blendsky_session';
   var DEFAULT_PDS = 'https://bsky.social';
   var APP_VIEW = 'https://api.bsky.app';
+  var PUBLIC_APP_VIEW = 'https://public.api.bsky.app';
   var PLC_DIRECTORY = 'https://plc.directory';
 
   // ——— Navigation ———
@@ -36,7 +37,10 @@ fetch('config.json')
     if (id === 'wiki') initWiki();
     if (id === 'forum') initForum();
     if (id === 'bluesky') initBluesky();
-    if (id === 'home') loadConstellationStats();
+    if (id === 'home') {
+      loadConstellationStats();
+      loadDiscoverB3d();
+    }
   }
 
   function formatStat(n) {
@@ -67,11 +71,65 @@ fetch('config.json')
       });
   }
 
+  function loadDiscoverB3d() {
+    var wrap = document.getElementById('home-discover-feed');
+    var loading = document.getElementById('home-discover-loading');
+    if (!wrap || !loading) return;
+    var url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#b3d') + '&limit=15&sort=latest';
+    fetch(url)
+      .then(function (r) {
+        if (!r.ok) return r.json().then(function (err) { throw new Error(err.message || r.statusText); });
+        return r.json();
+      })
+      .then(function (data) {
+        var posts = (data && data.posts) || (data && data.feed) || [];
+        loading.classList.add('hidden');
+        if (posts.length === 0) {
+          wrap.innerHTML = '<p class="muted">No recent #b3d posts. <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">Search on Bluesky</a>.</p>';
+          return;
+        }
+        wrap.innerHTML = posts.map(function (p) {
+          var author = p.author || {};
+          var handle = author.handle || author.did || '?';
+          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 200) : '';
+          if (text.length === 200) text += '…';
+          var postUri = p.uri ? 'https://bsky.app/profile/' + (author.did || p.uri.split('/')[2]) + '/post/' + (p.uri.split('/').pop() || '') : '#';
+          return (
+            '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="discover-card">' +
+              '<span class="discover-handle">@' + escapeHtml(handle) + '</span>' +
+              '<p class="discover-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
+            '</a>'
+          );
+        }).join('');
+      })
+      .catch(function () {
+        loading.classList.add('hidden');
+        wrap.innerHTML = '<p class="muted">Could not load #b3d posts. <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">Search on Bluesky</a> or try <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a>.</p>';
+      });
+  }
+
   navLinks.forEach(function (a) {
     a.addEventListener('click', function (e) {
       e.preventDefault();
       showView(a.getAttribute('data-nav'));
     });
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      var target = e.target;
+      var form = target && target.closest && target.closest('form');
+      if (form) {
+        e.preventDefault();
+        form.requestSubmit();
+        return;
+      }
+      if (target && (target.id === 'wiki-edit-title' || target.id === 'wiki-edit-body')) {
+        e.preventDefault();
+        var saveBtn = document.getElementById('wiki-save');
+        if (saveBtn && !document.getElementById('wiki-edit').classList.contains('hidden')) saveBtn.click();
+      }
+    }
   });
 
   // ——— Wiki (localStorage) ———
@@ -600,18 +658,55 @@ fetch('config.json')
       });
   }
 
+  /** Resolve a pckt.blog (or similar) URL to an at:// URI. Returns a promise that resolves to the at URI. */
+  function resolveUrlToAtUri(url) {
+    var trimmed = url.trim();
+    if (trimmed.indexOf('at://') === 0) return Promise.resolve(trimmed);
+    if (trimmed.indexOf('http://') !== 0 && trimmed.indexOf('https://') !== 0) return Promise.reject(new Error('Not a URL or AT URI'));
+    try {
+      var u = new URL(trimmed);
+      var path = u.pathname.replace(/\/$/, '');
+      var m = /^\/b\/([^/]+)\/([^/]+)$/.exec(path);
+      if (m) {
+        var handlePart = m[1];
+        var pathPart = m[2];
+        var handle = handlePart.indexOf('.') !== -1 ? handlePart : handlePart + '.bsky.social';
+        return resolveHandle(handle).then(function (did) {
+          if (!did) return Promise.reject(new Error('Could not resolve handle: ' + handle));
+          var ns = typeof StandardSite !== 'undefined' ? StandardSite.NS_DOCUMENT : 'site.standard.document';
+          var rkeysToTry = [pathPart];
+          var lastSegment = pathPart.lastIndexOf('-') !== -1 ? pathPart.slice(pathPart.lastIndexOf('-') + 1) : pathPart;
+          if (lastSegment && lastSegment !== pathPart) rkeysToTry.push(lastSegment);
+          function tryNext(i) {
+            if (i >= rkeysToTry.length) return Promise.reject(new Error('Document not found at that URL'));
+            var rkey = rkeysToTry[i];
+            var atUri = 'at://' + did + '/' + ns + '/' + rkey;
+            return fetchAtRecord(atUri).then(function (data) { return data.uri; }).catch(function () { return tryNext(i + 1); });
+          }
+          return tryNext(0);
+        });
+      }
+      return Promise.reject(new Error('URL format not recognized. Use an at:// URI or a pckt.blog /b/handle/slug URL.'));
+    } catch (e) {
+      return Promise.reject(e.message ? new Error(e.message) : e);
+    }
+  }
+
   document.getElementById('forum-import-btn').addEventListener('click', function () {
     var uriInput = document.getElementById('forum-import-uri');
-    var uri = (uriInput && uriInput.value && uriInput.value.trim()) || '';
-    if (!uri || uri.indexOf('at://') !== 0) {
-      alert('Enter a valid AT URI (e.g. at://did:plc:…/site.standard.document/…)');
+    var raw = (uriInput && uriInput.value && uriInput.value.trim()) || '';
+    if (!raw) {
+      alert('Enter an AT URI (at://did:plc:…/site.standard.document/…) or a URL (e.g. https://pckt.blog/b/you/slug).');
       return;
     }
-    var req = API
-      ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
-      : fetchAtRecord(uri);
-    req
-      .then(function (data) {
+    var atUriPromise = (raw.indexOf('at://') === 0)
+      ? Promise.resolve(raw)
+      : resolveUrlToAtUri(raw);
+    atUriPromise.then(function (uri) {
+      var req = API
+        ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
+        : fetchAtRecord(uri);
+      return req.then(function (data) {
         if (typeof StandardSite === 'undefined') throw new Error('StandardSite not loaded');
         var record = data.value || data.record || data;
         var author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
@@ -625,10 +720,10 @@ fetch('config.json')
         renderThreadList();
         openThread(newId);
         uriInput.value = '';
-      })
-      .catch(function (err) {
-        alert('Import failed: ' + (err.message || 'unknown'));
       });
+    }).catch(function (err) {
+      alert('Import failed: ' + (err.message || 'unknown'));
+    });
   });
 
   function initForum() {
