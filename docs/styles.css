@@ -719,7 +719,12 @@ body {
 .wiki-view-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
+}
+
+.wiki-sync-wrap {
+  margin-left: 0.25rem;
 }
 
 /* Wiki edit history panel */
@@ -742,15 +747,6 @@ body {
 .wiki-history-header h3 {
   margin: 0;
   font-size: 1rem;
-}
-
-.wiki-diff-pref {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
 }
 
 .wiki-history-list {
@@ -790,24 +786,13 @@ body {
   word-break: break-word;
 }
 
-/* Diff: green (add) / red (del) — default */
-.wiki-diff-body .diff-add {
-  background: rgba(34, 139, 34, 0.2);
-  color: #0d5c0d;
-}
-
-.wiki-diff-body .diff-del {
-  background: rgba(178, 34, 34, 0.2);
-  color: #a52a2a;
-}
-
 /* Diff: colorblind-friendly (blue add / orange del) */
-.wiki-diff-body .diff-add-cb {
+.wiki-diff-body .diff-add {
   background: rgba(30, 144, 255, 0.2);
   color: #0066b3;
 }
 
-.wiki-diff-body .diff-del-cb {
+.wiki-diff-body .diff-del {
   background: rgba(255, 165, 0, 0.25);
   color: #c47500;
 }

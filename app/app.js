@@ -503,14 +503,6 @@ fetch('config.json')
     return out;
   }
 
-  var STORAGE_DIFF_COLORBLIND = 'blendsky_diff_colorblind';
-  function getDiffColorblind() {
-    try { return localStorage.getItem(STORAGE_DIFF_COLORBLIND) === '1'; } catch (_) { return false; }
-  }
-  function setDiffColorblind(v) {
-    try { localStorage.setItem(STORAGE_DIFF_COLORBLIND, v ? '1' : ''); } catch (_) {}
-  }
-
   function openWikiPage(slug) {
     const pages = getWikiPages();
     const page = pages[slug];
@@ -537,10 +529,12 @@ fetch('config.json')
     document.getElementById('wiki-view').classList.remove('hidden');
     document.getElementById('wiki-edit').classList.add('hidden');
     updateWikiStatus(slug);
-    var reqEdit = document.getElementById('wiki-request-edit');
-    if (reqEdit) reqEdit.classList.toggle('hidden', !page.atUri);
     var suggestEdit = document.getElementById('wiki-suggest-edit');
     if (suggestEdit) suggestEdit.classList.toggle('hidden', !page.atUri);
+    var syncWrap = document.getElementById('wiki-sync-wrap');
+    if (syncWrap) {
+      syncWrap.innerHTML = '<button type="button" id="wiki-sync-bluesky-inline" class="btn btn-ghost btn-sm wiki-sync-inline" title="Sync to Bluesky">Sync</button>';
+    }
     var suggestedEditsSection = document.getElementById('wiki-suggested-edits');
     if (suggestedEditsSection) {
       suggestedEditsSection.classList.toggle('hidden', !page.atUri);
@@ -838,50 +832,42 @@ fetch('config.json')
     else initWiki();
   });
 
-  document.getElementById('wiki-sync-bluesky').addEventListener('click', function () {
-    if (!currentWikiSlug) {
-      alert('Open or create a page first.');
-      return;
+  (function () {
+    function onWikiSyncClick(e) {
+      var btn = e.target.closest('#wiki-sync-bluesky, #wiki-sync-bluesky-inline');
+      if (!btn) return;
+      if (!currentWikiSlug) {
+        alert('Open or create a page first.');
+        return;
+      }
+      var session = getStoredSession();
+      if (!session || !session.accessJwt) {
+        alert('Connect your Bluesky account first (Bluesky tab).');
+        return;
+      }
+      if (typeof BlendskyLexicon === 'undefined') {
+        alert('Blendsky lexicon script not loaded. Hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R) to load the latest code.');
+        return;
+      }
+      btn.disabled = true;
+      syncingWikiSlug = currentWikiSlug;
+      updateWikiStatus(currentWikiSlug);
+      doSyncWikiPage(currentWikiSlug)
+        .then(function () {
+          renderWikiList();
+          updateWikiStatus(currentWikiSlug);
+          btn.textContent = 'Synced';
+          setTimeout(function () { btn.textContent = 'Sync'; }, 2000);
+        })
+        .catch(function (err) {
+          updateWikiStatus(currentWikiSlug);
+          alert('Sync failed: ' + (err.message || 'unknown'));
+        })
+        .then(function () { btn.disabled = false; });
     }
-    var session = getStoredSession();
-    if (!session || !session.accessJwt) {
-      alert('Connect your Bluesky account first (Bluesky tab).');
-      return;
-    }
-    if (typeof BlendskyLexicon === 'undefined') {
-      alert('Blendsky lexicon script not loaded. Hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R) to load the latest code. If the problem continues, ensure blendsky-lexicon.js is in the same folder as this page.');
-      return;
-    }
-    var btn = this;
-    btn.disabled = true;
-    syncingWikiSlug = currentWikiSlug;
-    updateWikiStatus(currentWikiSlug);
-    doSyncWikiPage(currentWikiSlug)
-      .then(function () {
-        renderWikiList();
-        updateWikiStatus(currentWikiSlug);
-        btn.textContent = 'Synced';
-        setTimeout(function () { btn.textContent = 'Sync to Bluesky'; }, 2000);
-      })
-      .catch(function (err) {
-        updateWikiStatus(currentWikiSlug);
-        alert('Sync failed: ' + (err.message || 'unknown'));
-      })
-      .then(function () { btn.disabled = false; });
-  });
-
-  document.getElementById('wiki-request-edit').addEventListener('click', function () {
-    if (!currentWikiSlug) return;
-    var pages = getWikiPages();
-    var page = pages[currentWikiSlug];
-    if (!page || !page.atUri) return;
-    if (!page.replies) page.replies = [];
-    var session = getStoredSession();
-    var author = (session && session.handle) ? '@' + session.handle : 'You';
-    page.replies.push({ author: author, text: 'Requested edit access to this article.' });
-    setWikiPages(pages);
-    openWikiPage(currentWikiSlug);
-  });
+    var viewWiki = document.getElementById('view-wiki');
+    if (viewWiki) viewWiki.addEventListener('click', onWikiSyncClick);
+  })();
 
   document.getElementById('wiki-remix').addEventListener('click', function () {
     if (!currentWikiSlug) return;
@@ -967,19 +953,10 @@ fetch('config.json')
     var diffView = document.getElementById('wiki-diff-view');
     var diffTitle = document.getElementById('wiki-diff-title');
     var diffBody = document.getElementById('wiki-diff-body');
-    var colorblindCb = document.getElementById('wiki-diff-colorblind');
-    if (colorblindCb) {
-      colorblindCb.checked = getDiffColorblind();
-      colorblindCb.addEventListener('change', function () {
-        setDiffColorblind(colorblindCb.checked);
-        if (diffView && !diffView.classList.contains('hidden') && currentWikiSlug) renderWikiDiff(currentWikiSlug, diffView.dataset.oldBody || '', diffView.dataset.newBody || '');
-      });
-    }
     function renderWikiDiff(slug, oldBody, newBody) {
       if (!diffBody) return;
-      var cb = getDiffColorblind();
-      var addCls = cb ? 'diff-add-cb' : 'diff-add';
-      var delCls = cb ? 'diff-del-cb' : 'diff-del';
+      var addCls = 'diff-add';
+      var delCls = 'diff-del';
       var chunks = lineDiff(oldBody, newBody);
       diffBody.innerHTML = chunks.map(function (c) {
         var cls = c.type === 'add' ? addCls : c.type === 'del' ? delCls : '';
@@ -1525,7 +1502,7 @@ fetch('config.json')
         renderThreadList();
         openThread(id);
         btn.textContent = 'Synced';
-        setTimeout(function () { btn.textContent = 'Sync to Bluesky'; }, 2000);
+        setTimeout(function () { btn.textContent = 'Sync'; }, 2000);
       })
       .catch(function (err) {
         openThread(id);

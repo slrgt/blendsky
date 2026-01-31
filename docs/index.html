@@ -101,12 +101,11 @@
             <p class="wiki-edits-hint muted"><small>Remix creates a fork. Suggest edit adds your proposed change below for the author to see.</small></p>
             <div id="wiki-body" class="wiki-body"></div>
             <div class="wiki-view-actions">
-              <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
-              <button type="button" id="wiki-sync-bluesky" class="btn btn-secondary">Sync to Bluesky</button>
-              <button type="button" id="wiki-request-edit" class="btn btn-ghost hidden">Request edit</button>
-              <button type="button" id="wiki-suggest-edit" class="btn btn-ghost hidden">Suggest edit</button>
+              <button type="button" id="wiki-edit-btn" class="btn btn-primary">Edit</button>
               <button type="button" id="wiki-remix" class="btn btn-secondary">Remix</button>
               <button type="button" id="wiki-history-btn" class="btn btn-ghost">History</button>
+              <button type="button" id="wiki-suggest-edit" class="btn btn-ghost hidden">Suggest</button>
+              <span id="wiki-sync-wrap" class="wiki-sync-wrap"></span>
             </div>
             <section id="wiki-suggested-edits" class="wiki-suggested-edits hidden">
               <h3>Suggested edits</h3>
@@ -131,7 +130,6 @@
           <div id="wiki-history-panel" class="wiki-history-panel hidden">
             <div class="wiki-history-header">
               <h3>Edit history</h3>
-              <label class="wiki-diff-pref"><input type="checkbox" id="wiki-diff-colorblind" /> Colorblind-friendly</label>
               <button type="button" id="wiki-history-close" class="btn btn-ghost">Close</button>
             </div>
             <ul id="wiki-history-list" class="wiki-history-list"></ul>
@@ -181,9 +179,9 @@
         <button type="button" id="forum-back" class="btn btn-ghost">← Back to threads</button>
         <article id="forum-thread-detail"></article>
         <div id="forum-thread-standard" class="forum-thread-standard hidden">
-          <button type="button" id="forum-edit-thread-btn" class="btn btn-secondary">Edit thread</button>
-          <button type="button" id="forum-export-standard" class="btn btn-secondary">Export as document</button>
-          <button type="button" id="forum-sync-bluesky" class="btn btn-secondary">Sync to Bluesky</button>
+          <button type="button" id="forum-edit-thread-btn" class="btn btn-primary">Edit</button>
+          <button type="button" id="forum-sync-bluesky" class="btn btn-secondary">Sync</button>
+          <button type="button" id="forum-export-standard" class="btn btn-ghost" title="Export as document">Export</button>
         </div>
         <section class="forum-replies">
           <h3>Replies</h3>
