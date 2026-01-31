@@ -1460,62 +1460,67 @@ fetch('config.json')
         feedCards.forEach(function (c) { items.push({ sortAt: c.sortAt, _type: 'feed', c: c }); });
         items.sort(function (a, b) { return (b.sortAt || 0) - (a.sortAt || 0); });
         var parts = [];
-        // Lexicon cards first (Standard.site site.standard.document)
-        lexiconCards.forEach(function (c) {
-          var profile = c.profile || {};
-          var handle = profile.handle || c.did || '?';
-          var displayName = profile.displayName || handle;
-          var avatarUrl = profile.avatar || '';
-          var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
-          var avatarHtml = avatarUrl
-            ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
-            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
-          parts.push(
-            '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '">' +
-              '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to import this document">' +
-                '<div class="forum-discover-byline">' +
-                  avatarHtml +
-                  '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
-                  '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
-                '</div>' +
-                '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
-              '</a>' +
-              '<p class="forum-discover-author-meta">' +
-                (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
-                '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
-                '<span class="forum-discover-lexicon-tag">site.standard.document</span>' +
-              '</p>' +
-            '</div>'
-          );
-        });
-        feedCards.forEach(function (c) {
-          var p = c.post;
-          var author = p.author || {};
-          var handle = author.handle || author.did || '?';
-          var displayName = author.displayName || handle;
-          var did = author.did || '';
-          var avatarUrl = author.avatar || '';
-          var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : ('https://bsky.app/profile/' + (did || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
-          var profileUrl = bskyProfileUrl(author);
-          var avatarHtml = avatarUrl
-            ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
-            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
-          parts.push(
-            '<div class="forum-discover-card-wrap">' +
-              '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="forum-discover-card">' +
-                '<div class="forum-discover-byline">' +
-                  avatarHtml +
-                  '<span class="forum-discover-name">' + escapeHtml(displayName) + '</span>' +
-                  '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
-                '</div>' +
-                '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
-              '</a>' +
-              '<p class="forum-discover-author-meta">' +
-                (did ? '<span class="forum-discover-did" title="' + escapeHtml(did) + '">DID: ' + escapeHtml(did.length > 32 ? did.slice(0, 24) + '…' : did) + '</span> ' : '') +
-                '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a>' +
-              '</p>' +
-            '</div>'
-          );
+        items.forEach(function (item) {
+          if (item._type === 'lexicon') {
+            var c = item.c;
+            var profile = c.profile || {};
+            var handle = profile.handle || c.did || '?';
+            var displayName = profile.displayName || handle;
+            var avatarUrl = profile.avatar || '';
+            var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
+            var avatarHtml = avatarUrl
+              ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
+              : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
+            parts.push(
+              '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '">' +
+                '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to open this thread">' +
+                  '<div class="forum-discover-byline">' +
+                    avatarHtml +
+                    '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
+                    '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+                  '</div>' +
+                  '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
+                '</a>' +
+                '<p class="forum-discover-author-meta">' +
+                  (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
+                  '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
+                  '<span class="forum-discover-lexicon-tag">site.standard.document</span>' +
+                '</p>' +
+                '<p class="forum-discover-actions">' +
+                  '<button type="button" class="btn btn-ghost btn-sm forum-discover-remix-btn" title="Copy into a new thread and edit (remix tutorial)">Remix</button>' +
+                '</p>' +
+              '</div>'
+            );
+          } else {
+            var c = item.c;
+            var p = c.post;
+            var author = p.author || {};
+            var handle = author.handle || author.did || '?';
+            var displayName = author.displayName || handle;
+            var did = author.did || '';
+            var avatarUrl = author.avatar || '';
+            var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : ('https://bsky.app/profile/' + (did || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
+            var profileUrl = bskyProfileUrl(author);
+            var avatarHtml = avatarUrl
+              ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
+              : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
+            parts.push(
+              '<div class="forum-discover-card-wrap">' +
+                '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="forum-discover-card">' +
+                  '<div class="forum-discover-byline">' +
+                    avatarHtml +
+                    '<span class="forum-discover-name">' + escapeHtml(displayName) + '</span>' +
+                    '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+                  '</div>' +
+                  '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
+                '</a>' +
+                '<p class="forum-discover-author-meta">' +
+                  (did ? '<span class="forum-discover-did" title="' + escapeHtml(did) + '">DID: ' + escapeHtml(did.length > 32 ? did.slice(0, 24) + '…' : did) + '</span> ' : '') +
+                  '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a>' +
+                '</p>' +
+              '</div>'
+            );
+          }
         });
         if (parts.length === 0) {
           var session = getStoredSession();
