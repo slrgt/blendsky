@@ -20,6 +20,7 @@ fetch('config.json')
   var APP_VIEW = 'https://api.bsky.app';
   var PUBLIC_APP_VIEW = 'https://public.api.bsky.app';
   var PLC_DIRECTORY = 'https://plc.directory';
+  var CONSTELLATION_BASE = 'https://constellation.microcosm.blue';
 
   // ——— Navigation ———
   const views = document.querySelectorAll('.view');
@@ -279,9 +280,18 @@ fetch('config.json')
     html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="user-content-img" loading="lazy" />');
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/(https?:\/\/[^\s<>"']+\.(?:jpe?g|png|gif|webp))(?![\w])/gi, '<img src="$1" alt="" class="user-content-img" loading="lazy" />');
+    html = html.replace(/(https?:\/\/[^\s<>"']*getBlob[^\s<>"']*)/gi, '<img src="$1" alt="" class="user-content-img" loading="lazy" />');
     return html;
+  }
+
+  /** Turn body text into HTML with markdown and images (wiki and forum). */
+  function bodyToHtml(body) {
+    if (!body) return '';
+    return simpleMarkdown(body);
   }
 
   let currentWikiSlug = null;
@@ -621,7 +631,7 @@ fetch('config.json')
     if (thread.description) {
       body += '<p class="forum-description">' + escapeHtml(thread.description) + '</p>';
     }
-    body += '<div class="forum-reply text">' + escapeHtml(thread.body || '').replace(/\n/g, '<br>') + '</div>';
+    body += '<div class="forum-reply text forum-body-html">' + bodyToHtml(thread.body || '') + '</div>';
     if (thread.atUri) {
       body += '<p class="forum-at-uri muted"><small>Document: <a href="' + escapeHtml(thread.atUri) + '" target="_blank" rel="noopener">' + escapeHtml(thread.atUri) + '</a></small></p>';
     }
@@ -637,7 +647,7 @@ fetch('config.json')
           '<li class="forum-reply"><span class="author">' +
           escapeHtml(r.author || 'Anonymous') +
           '</span><div class="text">' +
-          escapeHtml(r.text).replace(/\n/g, '<br>') +
+          bodyToHtml(r.text) +
           '</div></li>'
         );
       })
@@ -663,6 +673,50 @@ fetch('config.json')
   document.getElementById('forum-new-cancel').addEventListener('click', function () {
     document.getElementById('forum-new-view').classList.add('hidden');
     renderThreadList();
+  });
+
+  function insertImageIntoBody(textareaId, blobUrl) {
+    var ta = document.getElementById(textareaId);
+    if (!ta) return;
+    var insert = '\n\n![image](' + blobUrl + ')\n\n';
+    var start = ta.selectionStart != null ? ta.selectionStart : ta.value.length;
+    var end = ta.selectionEnd != null ? ta.selectionEnd : ta.value.length;
+    ta.value = ta.value.slice(0, start) + insert + ta.value.slice(end);
+    ta.focus();
+  }
+
+  document.getElementById('forum-new-image').addEventListener('change', function () {
+    var input = this;
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var session = getStoredSession();
+    if (!session || !session.accessJwt) {
+      alert('Connect your Bluesky account first (Bluesky tab) to upload images.');
+      input.value = '';
+      return;
+    }
+    uploadBlobToBluesky(file).then(function (blobUrl) {
+      insertImageIntoBody('forum-new-body', blobUrl);
+    }).catch(function (err) {
+      alert('Upload failed: ' + (err.message || 'unknown'));
+    }).then(function () { input.value = ''; });
+  });
+
+  document.getElementById('forum-edit-image').addEventListener('change', function () {
+    var input = this;
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var session = getStoredSession();
+    if (!session || !session.accessJwt) {
+      alert('Connect your Bluesky account first (Bluesky tab) to upload images.');
+      input.value = '';
+      return;
+    }
+    uploadBlobToBluesky(file).then(function (blobUrl) {
+      insertImageIntoBody('forum-edit-body', blobUrl);
+    }).catch(function (err) {
+      alert('Upload failed: ' + (err.message || 'unknown'));
+    }).then(function () { input.value = ''; });
   });
 
   document.getElementById('forum-new-form').addEventListener('submit', function (e) {
@@ -927,33 +981,104 @@ fetch('config.json')
     });
   });
 
+  /** Fetch DIDs that link to target (e.g. site.standard.document records whose .site = origin). Returns Promise<{ uri, did }[]>. */
+  function fetchConstellationLinks(targetOrigin, collection, path, limit) {
+    var url = CONSTELLATION_BASE + '/links?target=' + encodeURIComponent(targetOrigin) + '&collection=' + encodeURIComponent(collection || 'site.standard.document') + '&path=' + encodeURIComponent(path || '.site') + '&limit=' + (limit || 30);
+    return fetch(url, { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var links = (data && data.links) || (data && data.sources) || (Array.isArray(data) ? data : []);
+        return links.map(function (l) {
+          var uri = l.source_uri || l.uri || (l.source && l.source.uri) || (l.source && l.source.record_uri) || '';
+          var did = (uri && uri.indexOf('at://') === 0) ? uri.split('/')[2] : '';
+          return { uri: uri, did: did };
+        }).filter(function (x) { return x.uri && x.uri.indexOf('at://') === 0; });
+      })
+      .catch(function () { return []; });
+  }
+
+  /** Fetch profile (handle, displayName, avatar) by DID from public API. */
+  function getProfileByDid(did) {
+    if (!did) return Promise.resolve(null);
+    var url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.actor.getProfile?actor=' + encodeURIComponent(did);
+    return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  }
+
   function loadForumDiscover() {
     var wrap = document.getElementById('forum-discover-feed');
     var loading = document.getElementById('forum-discover-loading');
     if (!wrap || !loading) return;
-    searchPostsBluesky('#blendsky-forum', 20)
-      .then(function (data) {
-        var posts = (data && data.posts) || (data && data.feed) || [];
-        loading.classList.add('hidden');
-        if (posts.length === 0) {
-          wrap.innerHTML = '<p class="muted">No #blendsky-forum threads yet. Sync a thread to add the tag.</p>';
-          return;
-        }
-        wrap.innerHTML = posts.map(function (p) {
+    var origin = typeof location !== 'undefined' ? location.origin : '';
+    var lexiconPromise = origin
+      ? fetchConstellationLinks(origin, 'site.standard.document', '.site', 25).then(function (links) {
+          return Promise.all(links.slice(0, 15).map(function (l) {
+            return fetchAtRecord(l.uri).then(function (data) {
+              var record = data.value || data.record;
+              var title = (record && record.title) || 'Untitled';
+              var content = (record && (record.content || record.textContent)) || '';
+              var snippet = String(content).replace(/\n/g, ' ').slice(0, 160);
+              if (snippet.length === 160) snippet += '…';
+              return { _type: 'lexicon', uri: l.uri, did: l.did, title: title, snippet: snippet };
+            }).catch(function () { return null; });
+          })).then(function (arr) { return arr.filter(Boolean); });
+        })
+      : Promise.resolve([]);
+    var feedPromise = searchPostsBluesky('#blendsky-forum', 20).then(function (data) {
+      var posts = (data && data.posts) || (data && data.feed) || [];
+      return posts.map(function (p) {
+        var author = p.author || {};
+        var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 160) : '';
+        if (text.length === 160) text += '…';
+        return { _type: 'feed', post: p, snippet: text };
+      });
+    }).catch(function () { return []; });
+    Promise.all([lexiconPromise, feedPromise]).then(function (results) {
+      var lexiconCards = results[0];
+      var feedCards = results[1];
+      loading.classList.add('hidden');
+      var profilePromises = lexiconCards.map(function (c) { return getProfileByDid(c.did).then(function (p) { c.profile = p; return c; }); });
+      Promise.all(profilePromises).then(function () {
+        var parts = [];
+        lexiconCards.forEach(function (c) {
+          var profile = c.profile || {};
+          var handle = profile.handle || c.did || '?';
+          var displayName = profile.displayName || handle;
+          var avatarUrl = profile.avatar || '';
+          var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
+          var avatarHtml = avatarUrl
+            ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
+            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
+          parts.push(
+            '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '">' +
+              '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to import this document">' +
+                '<div class="forum-discover-byline">' +
+                  avatarHtml +
+                  '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
+                  '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+                '</div>' +
+                '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
+              '</a>' +
+              '<p class="forum-discover-author-meta">' +
+                (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
+                '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
+                '<span class="forum-discover-lexicon-tag">site.standard.document</span>' +
+              '</p>' +
+            '</div>'
+          );
+        });
+        feedCards.forEach(function (c) {
+          var p = c.post;
           var author = p.author || {};
           var handle = author.handle || author.did || '?';
           var displayName = author.displayName || handle;
           var did = author.did || '';
           var avatarUrl = author.avatar || '';
-          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 160) : '';
-          if (text.length === 160) text += '…';
-          var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : null;
-          if (!postUri) postUri = 'https://bsky.app/profile/' + (author.did || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : '');
+          var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : ('https://bsky.app/profile/' + (did || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
           var profileUrl = bskyProfileUrl(author);
           var avatarHtml = avatarUrl
             ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
-            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || handle).charAt(0).toUpperCase() || '?') + '</span>';
-          return (
+            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
+          parts.push(
             '<div class="forum-discover-card-wrap">' +
               '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="forum-discover-card">' +
                 '<div class="forum-discover-byline">' +
@@ -961,7 +1086,7 @@ fetch('config.json')
                   '<span class="forum-discover-name">' + escapeHtml(displayName) + '</span>' +
                   '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
                 '</div>' +
-                '<p class="discover-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
+                '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
               '</a>' +
               '<p class="forum-discover-author-meta">' +
                 (did ? '<span class="forum-discover-did" title="' + escapeHtml(did) + '">DID: ' + escapeHtml(did.length > 32 ? did.slice(0, 24) + '…' : did) + '</span> ' : '') +
@@ -969,12 +1094,31 @@ fetch('config.json')
               '</p>' +
             '</div>'
           );
-        }).join('');
-      })
-      .catch(function () {
-        loading.classList.add('hidden');
-        wrap.innerHTML = '<p class="muted">See <a href="https://bsky.app/search?q=%23blendsky-forum" target="_blank" rel="noopener">#blendsky-forum on Bluesky</a> for forum threads.</p>';
+        });
+        if (parts.length === 0) {
+          wrap.innerHTML = '<p class="muted">No forum posts yet from the shared lexicon (site.standard.document) or Bluesky. Sync a thread to Bluesky to appear here; others who use this app with the same site origin will appear via the lexicon.</p>';
+          return;
+        }
+        wrap.innerHTML = parts.join('');
+        wrap.querySelectorAll('.forum-discover-card-lexicon').forEach(function (a) {
+          var wrapEl = a.closest('.forum-discover-card-wrap');
+          var uri = wrapEl && wrapEl.getAttribute('data-lexicon-uri');
+          if (!uri) return;
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            var input = document.getElementById('forum-import-uri');
+            if (input) {
+              input.value = uri;
+              input.focus();
+              document.querySelector('.forum-import-export').scrollIntoView({ behavior: 'smooth' });
+            }
+          });
+        });
       });
+    }).catch(function () {
+      loading.classList.add('hidden');
+      wrap.innerHTML = '<p class="muted">See <a href="https://bsky.app/search?q=%23blendsky-forum" target="_blank" rel="noopener">#blendsky-forum on Bluesky</a> or paste an AT URI below to import.</p>';
+    });
   }
 
   function initForum() {
@@ -1048,6 +1192,29 @@ fetch('config.json')
       }).then(function (res) {
         if (!res.ok) return res.json().then(function (err) { throw new Error(err.message || err.error || res.statusText); });
         return res.json();
+      });
+    });
+  }
+
+  /** Upload an image blob to the user's repo. Returns a URL that can be embedded in content (getBlob). */
+  function uploadBlobToBluesky(file) {
+    var session = getStoredSession();
+    if (!session || !session.accessJwt || !session.pdsUrl) return Promise.reject(new Error('Not connected to Bluesky'));
+    return ensureSessionDid(session).then(function (s) {
+      var url = s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.repo.uploadBlob';
+      return fetch(url, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + s.accessJwt, 'Content-Type': file.type || 'image/jpeg' },
+        body: file
+      }).then(function (res) {
+        if (!res.ok) return res.json().then(function (err) { throw new Error(err.message || err.error || res.statusText); });
+        return res.json();
+      }).then(function (data) {
+        var ref = (data && data.blob && data.blob.ref) ? data.blob.ref : data.ref;
+        var cid = (ref && ref.$link) ? ref.$link : (ref && ref.cid) ? ref.cid : null;
+        if (!cid) throw new Error('No blob ref returned');
+        var blobUrl = s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.sync.getBlob?did=' + encodeURIComponent(s.did) + '&cid=' + encodeURIComponent(cid);
+        return blobUrl;
       });
     });
   }
