@@ -1,0 +1,19 @@
+{
+  "name": "blendsky-server",
+  "version": "1.0.0",
+  "description": "Blendsky OAuth backend (pckt.blog-style Bluesky login)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@atproto/api": "^0.10.0",
+    "@atproto/jwk-jose": "^0.1.0",
+    "@atproto/oauth-client-node": "^0.3.0",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  }
+}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>blendsky — wikis, forums & your Bluesky feed</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="#" class="logo" data-nav="home">
+      <span class="logo-mark">blend</span><span class="logo-dot">sky</span>
+    </a>
+    <p class="tagline">wikis, forums & the people you follow</p>
+    <nav class="main-nav">
+      <a href="#" class="nav-link" data-nav="wiki">Wiki</a>
+      <a href="#" class="nav-link" data-nav="forum">Forum</a>
+      <a href="#" class="nav-link" data-nav="bluesky">Bluesky</a>
+    </nav>
+  </header>
+
+  <main class="main">
+    <!-- Landing (home) -->
+    <section id="view-home" class="view view-active">
+      <div class="hero">
+        <h1>What is blendsky?</h1>
+        <p class="lead">A simple place to grow wikis, join forums, and keep your Bluesky feed from the people you follow in one spot.</p>
+      </div>
+      <div class="features">
+        <article class="feature">
+          <h2>Build wikis</h2>
+          <p>Create and edit pages together. Focus on content, not setup.</p>
+          <a href="#" class="cta" data-nav="wiki">Go to Wiki</a>
+        </article>
+        <article class="feature">
+          <h2>Join the forum</h2>
+          <p>Start threads, reply, and discuss. Your community, your topics.</p>
+          <a href="#" class="cta" data-nav="forum">Go to Forum</a>
+        </article>
+        <article class="feature">
+          <h2>Your Bluesky feed</h2>
+          <p>See posts from everyone you follow on Bluesky, right here—powered by your timeline.</p>
+          <a href="#" class="cta" data-nav="bluesky">Connect & view feed</a>
+        </article>
+      </div>
+      <p class="ready">Ready to start?</p>
+      <p class="sub">Pick <strong>Wiki</strong>, <strong>Forum</strong>, or <strong>Bluesky</strong> above.</p>
+    </section>
+
+    <!-- Wiki -->
+    <section id="view-wiki" class="view">
+      <div class="wiki-toolbar">
+        <input type="text" id="wiki-search" class="wiki-search" placeholder="Search or create page…" />
+        <button type="button" id="wiki-new" class="btn btn-primary">New page</button>
+      </div>
+      <div class="wiki-content">
+        <aside class="wiki-sidebar">
+          <h3>Pages</h3>
+          <ul id="wiki-list" class="wiki-list"></ul>
+        </aside>
+        <article class="wiki-main">
+          <div id="wiki-view" class="wiki-view">
+            <h1 id="wiki-title"></h1>
+            <div id="wiki-body" class="wiki-body"></div>
+            <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
+          </div>
+          <div id="wiki-edit" class="wiki-edit hidden">
+            <input type="text" id="wiki-edit-title" class="wiki-edit-title" placeholder="Page title" />
+            <textarea id="wiki-edit-body" class="wiki-edit-body" placeholder="Write in Markdown…"></textarea>
+            <div class="wiki-edit-actions">
+              <button type="button" id="wiki-save" class="btn btn-primary">Save</button>
+              <button type="button" id="wiki-cancel" class="btn btn-ghost">Cancel</button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Forum -->
+    <section id="view-forum" class="view">
+      <div class="forum-toolbar">
+        <h2>Forum</h2>
+        <button type="button" id="forum-new-thread" class="btn btn-primary">New thread</button>
+      </div>
+      <div id="forum-thread-list" class="forum-thread-list"></div>
+      <div id="forum-thread-view" class="forum-thread-view hidden">
+        <button type="button" id="forum-back" class="btn btn-ghost">← Back to threads</button>
+        <article id="forum-thread-detail"></article>
+        <div id="forum-thread-standard" class="forum-thread-standard hidden">
+          <button type="button" id="forum-export-standard" class="btn btn-secondary">Export as standard.site document</button>
+        </div>
+        <section class="forum-replies">
+          <h3>Replies</h3>
+          <ul id="forum-replies-list"></ul>
+          <form id="forum-reply-form" class="forum-reply-form">
+            <textarea id="forum-reply-body" placeholder="Write a reply…" rows="3"></textarea>
+            <button type="submit" class="btn btn-primary">Reply</button>
+          </form>
+        </section>
+      </div>
+      <div id="forum-new-view" class="forum-new-view hidden">
+        <button type="button" id="forum-new-cancel" class="btn btn-ghost">← Cancel</button>
+        <form id="forum-new-form" class="forum-new-form">
+          <input type="text" id="forum-new-title" placeholder="Thread title (required)" required />
+          <input type="text" id="forum-new-path" class="forum-optional" placeholder="Path/slug (e.g. /my-post)" />
+          <textarea id="forum-new-description" class="forum-optional" placeholder="Short description (standard.site)" rows="2"></textarea>
+          <textarea id="forum-new-body" placeholder="First post…" rows="5" required></textarea>
+          <input type="text" id="forum-new-tags" class="forum-optional" placeholder="Tags, comma-separated" />
+          <button type="submit" class="btn btn-primary">Create thread</button>
+        </form>
+      </div>
+      <div class="forum-import-export">
+        <p class="forum-std-hint">Compatible with <a href="https://standard.site/" target="_blank" rel="noopener">standard.site</a>, <a href="https://tangled.org/mary.my.id/atcute" target="_blank" rel="noopener">atcute</a> (@atcute/standard-site, @atcute/pckt), and pckt.blog. Import from AT URI or export as document.</p>
+        <div class="forum-import-row">
+          <input type="text" id="forum-import-uri" placeholder="at://did:plc:…/site.standard.document/…" />
+          <button type="button" id="forum-import-btn" class="btn btn-secondary">Import document</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bluesky -->
+    <section id="view-bluesky" class="view">
+      <div class="bluesky-header">
+        <h2>Bluesky feed</h2>
+        <p class="bluesky-desc">Posts from everyone you follow. Connect your account to load your timeline.</p>
+      </div>
+      <div id="bluesky-connect" class="bluesky-connect">
+        <form id="bluesky-login-form" class="bluesky-login-form">
+          <input type="text" id="bluesky-handle" placeholder="you.bsky.social" required />
+          <button type="submit" class="btn btn-primary">Connect with Bluesky</button>
+        </form>
+        <p class="bluesky-hint">Same OAuth flow as pckt.blog: you’ll sign in on Bluesky and approve access. No app password.</p>
+      </div>
+      <div id="bluesky-feed-wrap" class="bluesky-feed-wrap hidden">
+        <div class="bluesky-feed-header">
+          <span id="bluesky-user"></span>
+          <button type="button" id="bluesky-disconnect" class="btn btn-ghost">Disconnect</button>
+        </div>
+        <div id="bluesky-feed" class="bluesky-feed"></div>
+        <button type="button" id="bluesky-load-more" class="btn btn-secondary hidden">Load more</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>blendsky — wikis, forums & your Bluesky feed</p>
+  </footer>
+
+  <script src="standard-site.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
