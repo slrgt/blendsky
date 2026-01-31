@@ -548,7 +548,7 @@ fetch('config.json')
       return;
     }
     if (typeof BlendskyLexicon === 'undefined') {
-      alert('Blendsky lexicon script not loaded.');
+      alert('Blendsky lexicon script not loaded. Hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R) to load the latest code. If the problem continues, ensure blendsky-lexicon.js is in the same folder as this page.');
       return;
     }
     var btn = this;
@@ -991,7 +991,7 @@ fetch('config.json')
       return;
     }
     if (typeof BlendskyLexicon === 'undefined') {
-      alert('Blendsky lexicon script not loaded.');
+      alert('Blendsky lexicon script not loaded. Hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R) to load the latest code. If the problem continues, ensure blendsky-lexicon.js is in the same folder as this page.');
       return;
     }
     var btn = this;
