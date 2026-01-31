@@ -79,7 +79,7 @@
           <div id="wiki-view" class="wiki-view">
             <h1 id="wiki-title"></h1>
             <p id="wiki-sync-status" class="sync-status" aria-live="polite"></p>
-            <p class="wiki-edits-hint muted"><small>Edits sync to Bluesky. Remix = fork (compatible with <a href="https://tangled.org" target="_blank" rel="noopener">tangled.org</a>). Request edit opens Bluesky compose.</small></p>
+            <p class="wiki-edits-hint muted"><small>Edits sync to Bluesky. Remix creates a fork. Request edit opens Bluesky compose.</small></p>
             <div id="wiki-body" class="wiki-body"></div>
             <div class="wiki-view-actions">
               <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
@@ -114,7 +114,7 @@
       </div>
       <div id="forum-discover" class="forum-discover">
         <h3>Forum posts from the community</h3>
-        <p class="forum-discover-hint muted">Posts from others using the shared lexicon <strong>site.standard.document</strong> (by site origin) and from Bluesky <strong>#blendsky-forum</strong>. Reply on Bluesky; to add a thread locally, paste its AT URI or pckt.blog URL below.</p>
+        <p class="forum-discover-hint muted">Posts from others using the <strong>app.blendsky.document</strong> lexicon (by site origin) and from Bluesky <strong>#blendsky-forum</strong>. Reply on Bluesky; to add a thread locally, paste its AT URI below.</p>
         <div id="forum-discover-feed" class="forum-discover-feed"><p class="muted" id="forum-discover-loading">Loading…</p></div>
       </div>
       <h3 class="forum-your-threads-title">Your threads</h3>
@@ -124,7 +124,7 @@
         <article id="forum-thread-detail"></article>
         <div id="forum-thread-standard" class="forum-thread-standard hidden">
           <button type="button" id="forum-edit-thread-btn" class="btn btn-secondary">Edit thread</button>
-          <button type="button" id="forum-export-standard" class="btn btn-secondary">Export as standard.site document</button>
+          <button type="button" id="forum-export-standard" class="btn btn-secondary">Export as document</button>
           <button type="button" id="forum-sync-bluesky" class="btn btn-secondary">Sync to Bluesky</button>
         </div>
         <section class="forum-replies">
@@ -181,9 +181,9 @@
         </form>
       </div>
       <div class="forum-import-export">
-        <p class="forum-std-hint">Compatible with <a href="https://standard.site/" target="_blank" rel="noopener">standard.site</a>, <a href="https://tangled.org/mary.my.id/atcute" target="_blank" rel="noopener">atcute</a> (@atcute/standard-site, @atcute/pckt), and pckt.blog. Import from AT URI or pckt.blog URL.</p>
+        <p class="forum-std-hint">Import forum or wiki documents from the AT Protocol. Paste an AT URI (<strong>app.blendsky.document</strong>).</p>
         <div class="forum-import-row">
-          <input type="text" id="forum-import-uri" placeholder="at://did:plc:… or https://pckt.blog/b/handle/slug" />
+          <input type="text" id="forum-import-uri" placeholder="at://did:plc:…/app.blendsky.document/…" />
           <button type="button" id="forum-import-btn" class="btn btn-secondary">Import document</button>
         </div>
       </div>
@@ -219,7 +219,7 @@
     <p>blendsky — Forum for Blender users sharing JSON geometry node setups</p>
   </footer>
 
-  <script src="standard-site.js"></script>
+  <script src="blendsky-lexicon.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

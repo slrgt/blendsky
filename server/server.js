@@ -1,5 +1,5 @@
 /**
- * blendsky — OAuth backend (pckt.blog-style Bluesky login)
+ * blendsky — OAuth backend (Bluesky login)
  * Serves client metadata, jwks, auth flow, and timeline API.
  */
 
@@ -195,7 +195,7 @@ app.get('/api/bluesky/timeline', async (req, res, next) => {
   }
 });
 
-// Fetch AT record by URI (for standard.site document import; public, no auth)
+// Fetch AT record by URI (for app.blendsky.document import; public, no auth)
 const APP_VIEW = 'https://api.bsky.app';
 const PLC_DIRECTORY = 'https://plc.directory';
 

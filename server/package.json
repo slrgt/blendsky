@@ -1,7 +1,7 @@
 {
   "name": "blendsky-server",
   "version": "1.0.0",
-  "description": "Blendsky OAuth backend (pckt.blog-style Bluesky login)",
+  "description": "Blendsky OAuth backend (Bluesky login)",
   "type": "module",
   "main": "server.js",
   "scripts": {

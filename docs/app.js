@@ -344,11 +344,11 @@ fetch('config.json')
     html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="user-content-img" loading="lazy" />');
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="user-content-img" loading="lazy" referrerpolicy="no-referrer" />');
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-    html = html.replace(/(https?:\/\/[^\s<>"']+\.(?:jpe?g|png|gif|webp))(?![\w])/gi, '<img src="$1" alt="" class="user-content-img" loading="lazy" />');
-    html = html.replace(/(https?:\/\/[^\s<>"']*getBlob[^\s<>"']*)/gi, '<img src="$1" alt="" class="user-content-img" loading="lazy" />');
+    html = html.replace(/(https?:\/\/[^\s<>"']+\.(?:jpe?g|png|gif|webp))(?![\w])/gi, '<img src="$1" alt="" class="user-content-img" loading="lazy" referrerpolicy="no-referrer" />');
+    html = html.replace(/(https?:\/\/[^\s<>"']*getBlob[^\s<>"']*(?:&(?:amp;)?[^\s<>"']*)*)/gi, '<img src="$1" alt="" class="user-content-img" loading="lazy" referrerpolicy="no-referrer" />');
     return html;
   }
 
@@ -517,7 +517,7 @@ fetch('config.json')
     document.getElementById('wiki-view').classList.remove('hidden');
     updateWikiStatus(newSlug);
     var session = getStoredSession();
-    if (session && session.accessJwt && typeof StandardSite !== 'undefined') {
+    if (session && session.accessJwt && typeof BlendskyLexicon !== 'undefined') {
       syncingWikiSlug = newSlug;
       updateWikiStatus(newSlug);
       doSyncWikiPage(newSlug).then(function () {
@@ -547,8 +547,8 @@ fetch('config.json')
       alert('Connect your Bluesky account first (Bluesky tab).');
       return;
     }
-    if (typeof StandardSite === 'undefined') {
-      alert('Standard.site script not loaded.');
+    if (typeof BlendskyLexicon === 'undefined') {
+      alert('Blendsky lexicon script not loaded.');
       return;
     }
     var btn = this;
@@ -872,7 +872,7 @@ fetch('config.json')
     renderThreadList();
     openThread(id);
     var session = getStoredSession();
-    if (session && session.accessJwt && typeof StandardSite !== 'undefined') {
+    if (session && session.accessJwt && typeof BlendskyLexicon !== 'undefined') {
       doSyncForumThread(id).then(function () {
         renderThreadList();
         openThread(id);
@@ -931,7 +931,7 @@ fetch('config.json')
     openThread(id);
     renderThreadList();
     var session = getStoredSession();
-    if (session && session.accessJwt && typeof StandardSite !== 'undefined') {
+    if (session && session.accessJwt && typeof BlendskyLexicon !== 'undefined') {
       syncingForumId = id;
       var statusEl = document.getElementById('forum-thread-sync-status');
       if (statusEl) { statusEl.textContent = 'Syncing…'; statusEl.className = 'sync-status sync-syncing'; }
@@ -967,14 +967,14 @@ fetch('config.json')
     const id = wrap && wrap.dataset.threadId ? Number(wrap.dataset.threadId) : null;
     const data = getForumData();
     const thread = data.threads.find(function (t) { return t.id === id; });
-    if (id == null || !thread || typeof StandardSite === 'undefined') return;
+    if (id == null || !thread || typeof BlendskyLexicon === 'undefined') return;
     const baseUrl = typeof location !== 'undefined' ? location.origin : '';
-    const doc = StandardSite.documentFromThread(thread, baseUrl);
-    const json = JSON.stringify({ $type: StandardSite.NS_DOCUMENT, ...doc, content: thread.body }, null, 2);
+    const doc = BlendskyLexicon.documentFromThread(thread, baseUrl);
+    const json = JSON.stringify(doc, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = (thread.path || 'thread-' + id) + '.standard.site.json';
+    a.download = (thread.path || 'thread-' + id) + '.blendsky.json';
     a.click();
     URL.revokeObjectURL(a.href);
   });
@@ -990,8 +990,8 @@ fetch('config.json')
       alert('Connect your Bluesky account first (Bluesky tab).');
       return;
     }
-    if (typeof StandardSite === 'undefined') {
-      alert('Standard.site script not loaded.');
+    if (typeof BlendskyLexicon === 'undefined') {
+      alert('Blendsky lexicon script not loaded.');
       return;
     }
     var btn = this;
@@ -1038,7 +1038,7 @@ fetch('config.json')
       });
   }
 
-  /** Resolve a pckt.blog (or similar) URL to an at:// URI. Returns a promise that resolves to the at URI. */
+  /** Resolve a /b/handle/slug URL to an at:// URI. Returns a promise that resolves to the at URI. */
   function resolveUrlToAtUri(url) {
     var trimmed = url.trim();
     if (trimmed.indexOf('at://') === 0) return Promise.resolve(trimmed);
@@ -1053,7 +1053,7 @@ fetch('config.json')
         var handle = handlePart.indexOf('.') !== -1 ? handlePart : handlePart + '.bsky.social';
         return resolveHandle(handle).then(function (did) {
           if (!did) return Promise.reject(new Error('Could not resolve handle: ' + handle));
-          var ns = typeof StandardSite !== 'undefined' ? StandardSite.NS_DOCUMENT : 'site.standard.document';
+          var ns = typeof BlendskyLexicon !== 'undefined' ? BlendskyLexicon.NS_DOCUMENT : 'app.blendsky.document';
           var rkeysToTry = [pathPart];
           var lastSegment = pathPart.lastIndexOf('-') !== -1 ? pathPart.slice(pathPart.lastIndexOf('-') + 1) : pathPart;
           if (lastSegment && lastSegment !== pathPart) rkeysToTry.push(lastSegment);
@@ -1066,7 +1066,7 @@ fetch('config.json')
           return tryNext(0);
         });
       }
-      return Promise.reject(new Error('URL format not recognized. Use an at:// URI or a pckt.blog /b/handle/slug URL.'));
+      return Promise.reject(new Error('URL format not recognized. Use an at:// URI or a /b/handle/slug URL.'));
     } catch (e) {
       return Promise.reject(e.message ? new Error(e.message) : e);
     }
@@ -1076,7 +1076,7 @@ fetch('config.json')
     var uriInput = document.getElementById('forum-import-uri');
     var raw = (uriInput && uriInput.value && uriInput.value.trim()) || '';
     if (!raw) {
-      alert('Enter an AT URI (at://did:plc:…/site.standard.document/…) or a URL (e.g. https://pckt.blog/b/you/slug).');
+      alert('Enter an AT URI (at://did:plc:…/app.blendsky.document/…) or a /b/handle/slug URL.');
       return;
     }
     var atUriPromise = (raw.indexOf('at://') === 0)
@@ -1087,10 +1087,10 @@ fetch('config.json')
         ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
         : fetchAtRecord(uri);
       return req.then(function (data) {
-        if (typeof StandardSite === 'undefined') throw new Error('StandardSite not loaded');
+        if (typeof BlendskyLexicon === 'undefined') throw new Error('BlendskyLexicon not loaded');
         var record = data.value || data.record || data;
         var author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
-        var thread = StandardSite.recordToThread(record, uri, author);
+        var thread = BlendskyLexicon.recordToThread(record, uri, author);
         if (!thread) throw new Error('Could not parse document');
         var forumData = getForumData();
         var newId = forumData.nextId++;
@@ -1106,15 +1106,15 @@ fetch('config.json')
     });
   });
 
-  /** Fetch DIDs that link to target (e.g. site.standard.document records whose .site = origin). Returns Promise<{ uri, did }[]>. */
+  /** Fetch DIDs that link to target (e.g. app.blendsky.document records whose .site = origin). Returns Promise<{ uri, did }[]>. */
   function fetchConstellationLinks(targetOrigin, collection, path, limit) {
-    var url = CONSTELLATION_BASE + '/links?target=' + encodeURIComponent(targetOrigin) + '&collection=' + encodeURIComponent(collection || 'site.standard.document') + '&path=' + encodeURIComponent(path || '.site') + '&limit=' + (limit || 30);
+    var url = CONSTELLATION_BASE + '/links?target=' + encodeURIComponent(targetOrigin) + '&collection=' + encodeURIComponent(collection || 'app.blendsky.document') + '&path=' + encodeURIComponent(path || '.site') + '&limit=' + (limit || 30);
     return fetch(url, { headers: { Accept: 'application/json' } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        var links = (data && data.links) || (data && data.sources) || (Array.isArray(data) ? data : []);
+        var links = (data && data.links) || (data && data.sources) || (data && data.records) || (Array.isArray(data) ? data : []);
         return links.map(function (l) {
-          var uri = l.source_uri || l.uri || (l.source && l.source.uri) || (l.source && l.source.record_uri) || '';
+          var uri = (l && (l.source_uri || l.uri || (l.source && l.source.uri) || (l.source && l.source.record_uri))) || (typeof l === 'string' ? l : '');
           var did = (uri && uri.indexOf('at://') === 0) ? uri.split('/')[2] : '';
           return { uri: uri, did: did };
         }).filter(function (x) { return x.uri && x.uri.indexOf('at://') === 0; });
@@ -1135,7 +1135,7 @@ fetch('config.json')
     if (!wrap || !loading) return;
     var origin = typeof location !== 'undefined' ? location.origin : '';
     var lexiconPromise = origin
-      ? fetchConstellationLinks(origin, 'site.standard.document', '.site', 25).then(function (links) {
+      ? fetchConstellationLinks(origin, 'app.blendsky.document', '.site', 25).then(function (links) {
           return Promise.all(links.slice(0, 15).map(function (l) {
             return fetchAtRecord(l.uri).then(function (data) {
               var record = data.value || data.record;
@@ -1148,7 +1148,7 @@ fetch('config.json')
           })).then(function (arr) { return arr.filter(Boolean); });
         })
       : Promise.resolve([]);
-    var feedPromise = searchPostsBluesky('#blendsky-forum', 20).then(function (data) {
+    var feedPromise = searchPostsBluesky('#blendsky-forum', 25).then(function (data) {
       var posts = (data && data.posts) || (data && data.feed) || [];
       return posts.map(function (p) {
         var author = p.author || {};
@@ -1156,7 +1156,9 @@ fetch('config.json')
         if (text.length === 160) text += '…';
         return { _type: 'feed', post: p, snippet: text };
       });
-    }).catch(function () { return []; });
+    }).catch(function (err) {
+      return [];
+    });
     Promise.all([lexiconPromise, feedPromise]).then(function (results) {
       var lexiconCards = results[0];
       var feedCards = results[1];
@@ -1164,33 +1166,6 @@ fetch('config.json')
       var profilePromises = lexiconCards.map(function (c) { return getProfileByDid(c.did).then(function (p) { c.profile = p; return c; }); });
       Promise.all(profilePromises).then(function () {
         var parts = [];
-        lexiconCards.forEach(function (c) {
-          var profile = c.profile || {};
-          var handle = profile.handle || c.did || '?';
-          var displayName = profile.displayName || handle;
-          var avatarUrl = profile.avatar || '';
-          var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
-          var avatarHtml = avatarUrl
-            ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
-            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
-          parts.push(
-            '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '">' +
-              '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to import this document">' +
-                '<div class="forum-discover-byline">' +
-                  avatarHtml +
-                  '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
-                  '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
-                '</div>' +
-                '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
-              '</a>' +
-              '<p class="forum-discover-author-meta">' +
-                (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
-                '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
-                '<span class="forum-discover-lexicon-tag">site.standard.document</span>' +
-              '</p>' +
-            '</div>'
-          );
-        });
         feedCards.forEach(function (c) {
           var p = c.post;
           var author = p.author || {};
@@ -1220,8 +1195,40 @@ fetch('config.json')
             '</div>'
           );
         });
+        lexiconCards.forEach(function (c) {
+          var profile = c.profile || {};
+          var handle = profile.handle || c.did || '?';
+          var displayName = profile.displayName || handle;
+          var avatarUrl = profile.avatar || '';
+          var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
+          var avatarHtml = avatarUrl
+            ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
+            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
+          parts.push(
+            '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '">' +
+              '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to import this document">' +
+                '<div class="forum-discover-byline">' +
+                  avatarHtml +
+                  '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
+                  '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+                '</div>' +
+                '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
+              '</a>' +
+              '<p class="forum-discover-author-meta">' +
+                (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
+                '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
+                '<span class="forum-discover-lexicon-tag">app.blendsky.document</span>' +
+              '</p>' +
+            '</div>'
+          );
+        });
         if (parts.length === 0) {
-          wrap.innerHTML = '<p class="muted">No forum posts yet from the shared lexicon (site.standard.document) or Bluesky. Sync a thread to Bluesky to appear here; others who use this app with the same site origin will appear via the lexicon.</p>';
+          var session = getStoredSession();
+          wrap.innerHTML = '<p class="muted">No forum posts from others yet. ' +
+            (session && session.accessJwt
+              ? 'Sync your own thread (use #blendsky-forum) to appear here; others who sync will show up in this list.'
+              : 'Connect your Bluesky account (Bluesky tab) to see forum posts from others. Sync your own thread to add #blendsky-forum.') +
+            ' Or paste an AT URI below to import a thread.</p>';
           return;
         }
         wrap.innerHTML = parts.join('');
@@ -1426,17 +1433,21 @@ fetch('config.json')
     return chunks;
   }
 
-  /** Create a single feed post or a thread (replies). Returns promise that resolves to { postUris }. */
-  function postFeedTextOrThread(text) {
+  /** Create a single feed post or a thread (replies). Returns promise that resolves to { postUris }. blobRefs optional for first post embed. */
+  function postFeedTextOrThread(text, blobRefs) {
     var chunks = splitSentences(text, BSKY_POST_MAX);
     if (chunks.length === 0) return Promise.resolve({ postUris: [] });
     var now = new Date().toISOString();
-    function makePost(txt, replyRef) {
+    var refs = (blobRefs && blobRefs.length) ? blobRefs.slice(0, 4) : [];
+    function makePost(txt, replyRef, embedRefs) {
       var rec = { $type: 'app.bsky.feed.post', text: txt, createdAt: now };
       if (replyRef) rec.reply = replyRef;
+      if (embedRefs && embedRefs.length > 0) {
+        rec.embed = { $type: 'app.bsky.embed.images', images: embedRefs.map(function (r) { return { image: r, alt: '' }; }) };
+      }
       return rec;
     }
-    return createRecordToBluesky('app.bsky.feed.post', makePost(chunks[0], null))
+    return createRecordToBluesky('app.bsky.feed.post', makePost(chunks[0], null, refs))
       .then(function (first) {
         var uris = [first.uri];
         var root = { uri: first.uri, cid: first.cid };
@@ -1457,28 +1468,44 @@ fetch('config.json')
       });
   }
 
-  /** Build full plain text for feed (title + body) and post as one or thread. */
-  function postContentAsFeed(title, body) {
+  /** Extract blob refs { $link: cid } from body that contains getBlob URLs (from our upload). */
+  function extractBlobRefsFromBody(body) {
+    if (!body || typeof body !== 'string') return [];
+    var refs = [];
+    var re = /https?:\/\/[^\s"'<>]*getBlob[^\s"'<>]*(?:&(?:amp;)?[^\s"'<>]*)*/gi;
+    var m;
+    while ((m = re.exec(body)) !== null) {
+      try {
+        var u = new URL(m[0].replace(/&amp;/g, '&'));
+        var cid = u.searchParams.get('cid');
+        if (cid) refs.push({ $link: cid });
+      } catch (_) {}
+    }
+    return refs.slice(0, 4);
+  }
+
+  /** Build full plain text for feed (title + body) and post as one or thread. Optional blobRefs for embed.images. */
+  function postContentAsFeed(title, body, blobRefs) {
     var full = (title ? title + '\n\n' : '') + (body || '');
     var text = full.trim() || 'Posted from blendsky';
-    return postFeedTextOrThread(text);
+    return postFeedTextOrThread(text, blobRefs);
   }
 
   var syncingWikiSlug = null;
   var syncingForumId = null;
 
-  /** Full sync: put site.standard.document + post feed (single or thread). Updates page.atUri. */
+  /** Full sync: put app.blendsky.document + post feed (single or thread). Updates page.atUri. */
   function doSyncWikiPage(slug) {
     var pages = getWikiPages();
     var page = pages[slug];
-    if (!page || typeof StandardSite === 'undefined') return Promise.resolve();
+    if (!page || typeof BlendskyLexicon === 'undefined') return Promise.resolve();
     var session = getStoredSession();
     if (!session || !session.accessJwt) return Promise.resolve();
     syncingWikiSlug = slug;
     var baseUrl = typeof location !== 'undefined' ? location.origin : '';
-    var record = StandardSite.documentFromWikiPage(page, slug, baseUrl);
+    var record = BlendskyLexicon.documentFromWikiPage(page, slug, baseUrl);
     var rkey = sanitizeRkey(slug);
-    return putRecordToBluesky(StandardSite.NS_DOCUMENT, rkey, record)
+    return putRecordToBluesky(BlendskyLexicon.NS_DOCUMENT, rkey, record)
       .then(function (res) {
         page.atUri = res.uri;
         page.updatedAt = new Date().toISOString();
@@ -1495,23 +1522,24 @@ fetch('config.json')
       .then(function () { syncingWikiSlug = null; }, function () { syncingWikiSlug = null; });
   }
 
-  /** Full sync: put site.standard.document + post feed (single or thread). Updates thread.atUri. */
+  /** Full sync: put app.blendsky.document + post feed (single or thread). Updates thread.atUri. */
   function doSyncForumThread(threadId) {
     var data = getForumData();
     var thread = data.threads.find(function (t) { return t.id === threadId; });
-    if (!thread || typeof StandardSite === 'undefined') return Promise.resolve();
+    if (!thread || typeof BlendskyLexicon === 'undefined') return Promise.resolve();
     var session = getStoredSession();
     if (!session || !session.accessJwt) return Promise.resolve();
     syncingForumId = threadId;
     var baseUrl = typeof location !== 'undefined' ? location.origin : '';
-    var doc = StandardSite.documentFromThread(thread, baseUrl);
-    var record = { $type: StandardSite.NS_DOCUMENT, ...doc, content: thread.body || '' };
+    var record = BlendskyLexicon.documentFromThread(thread, baseUrl);
     var rkey = sanitizeRkey(thread.path || 'thread-' + thread.id);
-    return putRecordToBluesky(StandardSite.NS_DOCUMENT, rkey, record)
+    var bodyWithTag = (thread.body || '') + '\n\n#blendsky-forum';
+    var blobRefs = extractBlobRefsFromBody(thread.body || '');
+    return putRecordToBluesky(BlendskyLexicon.NS_DOCUMENT, rkey, record)
       .then(function (res) {
         thread.atUri = res.uri;
         thread.updatedAt = new Date().toISOString();
-        return postContentAsFeed(thread.title, (thread.body || '') + '\n\n#blendsky-forum');
+        return postContentAsFeed(thread.title, bodyWithTag, blobRefs);
       })
       .then(function (result) {
         if (result && result.postUris && result.postUris[0]) thread.feedPostUri = result.postUris[0];

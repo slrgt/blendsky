@@ -20,14 +20,14 @@ Your site will be at **`https://<username>.github.io/<repo>/`** (e.g. `https://u
   - **Option A:** Run the sync workflow — on push to `main` with changes under `app/`, the **Sync docs for GitHub Pages** workflow copies `app/` → `docs/` and commits. No manual copy needed.
   - **Option B:** Manually copy before pushing:
     ```bash
-    cp app/index.html app/app.js app/standard-site.js app/styles.css docs/
+    cp app/index.html app/app.js app/blendsky-lexicon.js app/styles.css app/config.json docs/
     ```
 
 ## 3. What works on GitHub Pages
 
 Everything works on GitHub Pages with **no backend**. Data and auth use the browser and the AT Protocol.
 
-- **Wiki** and **Forum** — data is stored in the browser (localStorage). Forum threads can be exported/imported as AT Protocol records (e.g. `site.standard.document`).
+- **Wiki** and **Forum** — data is stored in the browser (localStorage). Forum and wiki documents can be exported/imported as AT Protocol records (`app.blendsky.document`).
 - **Bluesky** — with the default config (no `apiBase`), use your Bluesky handle and an [app password](https://bsky.app/settings/app-passwords). The app talks to the AT Protocol (your PDS) directly from the browser. No server is required.
 
 ### Optional: OAuth via your own server

@@ -1,6 +1,6 @@
 # blendsky
 
-**A forum for Blender users sharing JSON geometry node setups.** Post node trees, document setups in the wiki, discuss in threads, and sync everything to Bluesky so the community can find you. pckt.blog-style UI and [standard.site](https://standard.site/)–compatible. **Runs fully on GitHub Pages with no backend** — Bluesky uses an app password and talks to the AT Protocol from the browser.
+**A forum for Blender users sharing JSON geometry node setups.** Post node trees, document setups in the wiki, discuss in threads, and sync everything to Bluesky so the community can find you. Uses the **app.blendsky.document** lexicon for forums and wikis on the AT Protocol. **Runs fully on GitHub Pages with no backend** — Bluesky uses an app password and talks to the AT Protocol from the browser.
 
 - **App:** `app/` — static HTML/CSS/JS (Wiki, Forum, Bluesky). Deploy `docs/` to GitHub Pages; everything works there (Wiki, Forum, Bluesky feed, forum import from AT URI).
 - **Server:** `server/` — optional Node/Express OAuth backend. Use it if you prefer OAuth over app password; set `apiBase` in `config.json` to your server URL. Without a server, the app uses app password and works entirely in the browser.
