@@ -38,8 +38,9 @@ fetch('config.json')
     if (id === 'forum') initForum();
     if (id === 'bluesky') initBluesky();
     if (id === 'home') {
-      loadConstellationStats();
+      loadHomeRecent();
       loadDiscoverB3d();
+      loadConstellationStats();
     }
   }
 
@@ -54,36 +55,64 @@ fetch('config.json')
   function loadConstellationStats() {
     var block = document.getElementById('home-constellation');
     var list = document.getElementById('constellation-stats');
-    var trendingMeta = document.getElementById('trending-meta');
+    if (!block || !list) return;
     fetch('https://constellation.microcosm.blue/', { headers: { Accept: 'application/json' } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var s = data.stats || {};
-        if (trendingMeta) {
-          trendingMeta.innerHTML =
-            formatStat(s.linking_records) + ' links indexed · ' +
-            '<a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener">Constellation</a> · ' +
-            '<a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a>';
-        }
-        if (block && list) {
-          block.classList.remove('hidden');
-          list.innerHTML =
-            '<dt>Identities (DIDs)</dt><dd>' + formatStat(s.dids) + '</dd>' +
-            '<dt>Targetables</dt><dd>' + formatStat(s.targetables) + '</dd>' +
-            '<dt>Linking records</dt><dd>' + formatStat(s.linking_records) + '</dd>' +
-            (data.days_indexed != null ? '<dt>Days indexed</dt><dd>' + data.days_indexed + '</dd>' : '');
-        }
+        block.classList.remove('hidden');
+        list.innerHTML =
+          '<dt>Identities (DIDs)</dt><dd>' + formatStat(s.dids) + '</dd>' +
+          '<dt>Targetables</dt><dd>' + formatStat(s.targetables) + '</dd>' +
+          '<dt>Linking records</dt><dd>' + formatStat(s.linking_records) + '</dd>' +
+          (data.days_indexed != null ? '<dt>Days indexed</dt><dd>' + data.days_indexed + '</dd>' : '');
       })
       .catch(function () {
-        if (block) block.classList.add('hidden');
+        block.classList.add('hidden');
       });
+  }
+
+  function loadHomeRecent() {
+    var wrap = document.getElementById('home-recent-feed');
+    if (!wrap) return;
+    var wikiPages = getWikiPages();
+    var forumData = getForumData();
+    var wikiKeys = Object.keys(wikiPages).sort().slice(-5).reverse();
+    var threads = (forumData.threads || []).slice().reverse().slice(0, 5);
+    var parts = [];
+    wikiKeys.forEach(function (slug) {
+      var p = wikiPages[slug];
+      var title = (p && p.title) || slug;
+      parts.push('<a href="#" class="home-recent-item" data-nav="wiki" data-wiki-slug="' + escapeHtml(slug) + '"><span class="home-recent-type">Wiki</span> ' + escapeHtml(title) + '</a>');
+    });
+    threads.forEach(function (t) {
+      parts.push('<a href="#" class="home-recent-item" data-nav="forum" data-thread-id="' + t.id + '"><span class="home-recent-type">Forum</span> ' + escapeHtml(t.title || 'Untitled') + '</a>');
+    });
+    if (parts.length === 0) {
+      wrap.innerHTML = '<p class="muted">No wiki pages or forum threads yet. Create one from Wiki or Forum.</p>';
+      return;
+    }
+    wrap.innerHTML = parts.join('');
+    wrap.querySelectorAll('.home-recent-item').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        var nav = a.getAttribute('data-nav');
+        if (nav === 'wiki') {
+          showView('wiki');
+          openWikiPage(a.getAttribute('data-wiki-slug'));
+        } else if (nav === 'forum') {
+          showView('forum');
+          openThread(Number(a.getAttribute('data-thread-id')));
+        }
+      });
+    });
   }
 
   function loadDiscoverB3d() {
     var wrap = document.getElementById('home-discover-feed');
     var loading = document.getElementById('home-discover-loading');
     if (!wrap || !loading) return;
-    var url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#b3d') + '&limit=15&sort=latest';
+    var url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#b3d') + '&limit=8&sort=latest';
     fetch(url)
       .then(function (r) {
         if (!r.ok) return r.json().then(function (err) { throw new Error(err.message || r.statusText); });
@@ -93,14 +122,14 @@ fetch('config.json')
         var posts = (data && data.posts) || (data && data.feed) || [];
         loading.classList.add('hidden');
         if (posts.length === 0) {
-          wrap.innerHTML = '<p class="muted">No recent #b3d posts. <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">Search on Bluesky</a>.</p>';
+          wrap.innerHTML = '<p class="muted">No #b3d posts right now. <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">See #b3d on Bluesky</a>.</p>';
           return;
         }
         wrap.innerHTML = posts.map(function (p) {
           var author = p.author || {};
           var handle = author.handle || author.did || '?';
-          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 200) : '';
-          if (text.length === 200) text += '…';
+          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 160) : '';
+          if (text.length === 160) text += '…';
           var postUri = p.uri ? 'https://bsky.app/profile/' + (author.did || p.uri.split('/')[2]) + '/post/' + (p.uri.split('/').pop() || '') : '#';
           return (
             '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="discover-card">' +
@@ -112,7 +141,7 @@ fetch('config.json')
       })
       .catch(function () {
         loading.classList.add('hidden');
-        wrap.innerHTML = '<p class="muted">Could not load #b3d posts. <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">Search on Bluesky</a> or try <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a>.</p>';
+        wrap.innerHTML = '<p class="muted">See <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">#b3d on Bluesky</a> for recent posts.</p>';
       });
   }
 
@@ -816,7 +845,7 @@ fetch('config.json')
       })
       .catch(function () {
         loading.classList.add('hidden');
-        wrap.innerHTML = '<p class="muted">Could not load. <a href="https://bsky.app/search?q=%23blendsky-forum" target="_blank" rel="noopener">Search #blendsky-forum</a>.</p>';
+        wrap.innerHTML = '<p class="muted">See <a href="https://bsky.app/search?q=%23blendsky-forum" target="_blank" rel="noopener">#blendsky-forum on Bluesky</a> for forum threads.</p>';
       });
   }
 
