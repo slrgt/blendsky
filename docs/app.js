@@ -54,20 +54,28 @@ fetch('config.json')
   function loadConstellationStats() {
     var block = document.getElementById('home-constellation');
     var list = document.getElementById('constellation-stats');
-    if (!block || !list) return;
+    var trendingMeta = document.getElementById('trending-meta');
     fetch('https://constellation.microcosm.blue/', { headers: { Accept: 'application/json' } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        block.classList.remove('hidden');
         var s = data.stats || {};
-        list.innerHTML =
-          '<dt>Identities (DIDs)</dt><dd>' + formatStat(s.dids) + '</dd>' +
-          '<dt>Targetables</dt><dd>' + formatStat(s.targetables) + '</dd>' +
-          '<dt>Linking records</dt><dd>' + formatStat(s.linking_records) + '</dd>' +
-          (data.days_indexed != null ? '<dt>Days indexed</dt><dd>' + data.days_indexed + '</dd>' : '');
+        if (trendingMeta) {
+          trendingMeta.innerHTML =
+            formatStat(s.linking_records) + ' links indexed · ' +
+            '<a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener">Constellation</a> · ' +
+            '<a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a>';
+        }
+        if (block && list) {
+          block.classList.remove('hidden');
+          list.innerHTML =
+            '<dt>Identities (DIDs)</dt><dd>' + formatStat(s.dids) + '</dd>' +
+            '<dt>Targetables</dt><dd>' + formatStat(s.targetables) + '</dd>' +
+            '<dt>Linking records</dt><dd>' + formatStat(s.linking_records) + '</dd>' +
+            (data.days_indexed != null ? '<dt>Days indexed</dt><dd>' + data.days_indexed + '</dd>' : '');
+        }
       })
       .catch(function () {
-        block.classList.add('hidden');
+        if (block) block.classList.add('hidden');
       });
   }
 
@@ -207,10 +215,16 @@ fetch('config.json')
     if (!page) return;
     currentWikiSlug = slug;
     document.getElementById('wiki-title').textContent = page.title || slug;
-    document.getElementById('wiki-body').innerHTML = simpleMarkdown(page.body || '');
+    var bodyHtml = simpleMarkdown(page.body || '');
+    if (page.remixedFrom) {
+      bodyHtml = '<p class="wiki-remixed-from muted"><small>Remixed from: <a href="' + escapeHtml(page.remixedFrom) + '" target="_blank" rel="noopener">' + escapeHtml(page.remixedFrom) + '</a></small></p>' + bodyHtml;
+    }
+    document.getElementById('wiki-body').innerHTML = bodyHtml;
     document.getElementById('wiki-view').classList.remove('hidden');
     document.getElementById('wiki-edit').classList.add('hidden');
     updateWikiStatus(slug);
+    var reqEdit = document.getElementById('wiki-request-edit');
+    if (reqEdit) reqEdit.classList.toggle('hidden', !page.atUri);
   }
 
   function updateWikiStatus(slug) {
@@ -268,7 +282,12 @@ fetch('config.json')
     const pages = getWikiPages();
     const newSlug = slugify(title);
     if (currentWikiSlug && currentWikiSlug !== newSlug) delete pages[currentWikiSlug];
+    var existing = currentWikiSlug && pages[currentWikiSlug] ? pages[currentWikiSlug] : null;
     pages[newSlug] = { title: title, body: body };
+    if (existing) {
+      if (existing.atUri) pages[newSlug].atUri = existing.atUri;
+      if (existing.remixedFrom) pages[newSlug].remixedFrom = existing.remixedFrom;
+    }
     setWikiPages(pages);
     currentWikiSlug = newSlug;
     renderWikiList();
@@ -328,6 +347,38 @@ fetch('config.json')
         alert('Sync failed: ' + (err.message || 'unknown'));
       })
       .then(function () { btn.disabled = false; });
+  });
+
+  document.getElementById('wiki-request-edit').addEventListener('click', function () {
+    if (!currentWikiSlug) return;
+    var pages = getWikiPages();
+    var page = pages[currentWikiSlug];
+    if (!page || !page.atUri) return;
+    var text = 'Requesting edit access to “' + (page.title || 'Untitled') + '”: ' + page.atUri;
+    var url = 'https://bsky.app/intent/compose?text=' + encodeURIComponent(text);
+    window.open(url, '_blank', 'noopener');
+  });
+
+  document.getElementById('wiki-remix').addEventListener('click', function () {
+    if (!currentWikiSlug) return;
+    var pages = getWikiPages();
+    var page = pages[currentWikiSlug];
+    if (!page) return;
+    var baseTitle = page.title || 'Untitled';
+    var newTitle = baseTitle + ' (remix)';
+    var newSlug = slugify(newTitle);
+    var body = page.body || '';
+    if (page.atUri) body = 'Remixed from: ' + page.atUri + '\n\n' + body;
+    var newPage = { title: newTitle, body: body };
+    if (page.atUri) newPage.remixedFrom = page.atUri;
+    pages[newSlug] = newPage;
+    setWikiPages(pages);
+    currentWikiSlug = newSlug;
+    renderWikiList();
+    document.getElementById('wiki-edit-title').value = newTitle;
+    document.getElementById('wiki-edit-body').value = newPage.body;
+    document.getElementById('wiki-view').classList.add('hidden');
+    document.getElementById('wiki-edit').classList.remove('hidden');
   });
 
   document.getElementById('wiki-search').addEventListener('keydown', function (e) {
@@ -426,7 +477,11 @@ fetch('config.json')
     }
     body += '<div class="forum-reply text">' + escapeHtml(thread.body || '').replace(/\n/g, '<br>') + '</div>';
     if (thread.atUri) {
-      body += '<p class="forum-at-uri muted"><small>From <a href="' + escapeHtml(thread.atUri) + '" target="_blank" rel="noopener">' + escapeHtml(thread.atUri) + '</a></small></p>';
+      body += '<p class="forum-at-uri muted"><small>Document: <a href="' + escapeHtml(thread.atUri) + '" target="_blank" rel="noopener">' + escapeHtml(thread.atUri) + '</a></small></p>';
+    }
+    var replyPostUrl = thread.feedPostUri ? feedPostUriToBskyUrl(thread.feedPostUri) : null;
+    if (replyPostUrl) {
+      body += '<p class="forum-reply-on-bluesky"><a href="' + escapeHtml(replyPostUrl) + '" target="_blank" rel="noopener" class="btn btn-secondary">Reply on Bluesky</a></p>';
     }
     detail.innerHTML = body;
     const repliesList = document.getElementById('forum-replies-list');
@@ -726,8 +781,48 @@ fetch('config.json')
     });
   });
 
+  function loadForumDiscover() {
+    var wrap = document.getElementById('forum-discover-feed');
+    var loading = document.getElementById('forum-discover-loading');
+    if (!wrap || !loading) return;
+    var q = encodeURIComponent('#blendsky-forum');
+    var url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + q + '&limit=10&sort=latest';
+    fetch(url)
+      .then(function (r) {
+        if (!r.ok) return r.json().then(function (err) { throw new Error(err.message || r.statusText); });
+        return r.json();
+      })
+      .then(function (data) {
+        var posts = (data && data.posts) || (data && data.feed) || [];
+        loading.classList.add('hidden');
+        if (posts.length === 0) {
+          wrap.innerHTML = '<p class="muted">No #blendsky-forum threads yet. Sync a thread to add the tag.</p>';
+          return;
+        }
+        wrap.innerHTML = posts.map(function (p) {
+          var author = p.author || {};
+          var handle = author.handle || author.did || '?';
+          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 120) : '';
+          if (text.length === 120) text += '…';
+          var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : null;
+          if (!postUri) postUri = 'https://bsky.app/profile/' + (author.did || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : '');
+          return (
+            '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="forum-discover-card">' +
+              '<span class="discover-handle">@' + escapeHtml(handle) + '</span>' +
+              '<p class="discover-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
+            '</a>'
+          );
+        }).join('');
+      })
+      .catch(function () {
+        loading.classList.add('hidden');
+        wrap.innerHTML = '<p class="muted">Could not load. <a href="https://bsky.app/search?q=%23blendsky-forum" target="_blank" rel="noopener">Search #blendsky-forum</a>.</p>';
+      });
+  }
+
   function initForum() {
     renderThreadList();
+    loadForumDiscover();
   }
 
   // ——— Bluesky (serverless: app password + PDS, or server: OAuth) ———
@@ -822,6 +917,16 @@ fetch('config.json')
         return res.json();
       });
     });
+  }
+
+  /** Convert feed post AT URI to bsky.app profile/post URL for replying. */
+  function feedPostUriToBskyUrl(atUri) {
+    if (!atUri || atUri.indexOf('at://') !== 0) return null;
+    var parts = atUri.replace(/^at:\/\//, '').split('/');
+    if (parts.length < 3) return null;
+    var did = parts[0];
+    var rkey = parts[parts.length - 1];
+    return 'https://bsky.app/profile/' + encodeURIComponent(did) + '/post/' + encodeURIComponent(rkey);
   }
 
   /** Sanitize string for use as AT record rkey (alphanumeric, dots, underscores, hyphens). */
@@ -957,9 +1062,10 @@ fetch('config.json')
       .then(function (res) {
         thread.atUri = res.uri;
         thread.updatedAt = new Date().toISOString();
-        return postContentAsFeed(thread.title, thread.body);
+        return postContentAsFeed(thread.title, (thread.body || '') + '\n\n#blendsky-forum');
       })
-      .then(function () {
+      .then(function (result) {
+        if (result && result.postUris && result.postUris[0]) thread.feedPostUri = result.postUris[0];
         setForumData(data);
       })
       .catch(function (err) {

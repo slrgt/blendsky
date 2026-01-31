@@ -170,20 +170,72 @@ body {
   font-size: 0.95rem;
 }
 
-.home-discover {
-  margin: 2rem 0;
+/* Very top: trending #b3d + Blender/art feeds (Constellation & UFOs) */
+.home-trending {
+  margin: 0 0 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.home-discover h2 {
+.trending-header {
+  margin-bottom: 0.75rem;
+}
+
+.trending-title {
   font-family: var(--font-serif);
-  font-size: 1.2rem;
-  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
 }
 
-.discover-intro {
-  margin: 0 0 1rem;
+.trending-meta {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.trending-meta a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.trending-meta a:hover {
+  text-decoration: underline;
+}
+
+.trending-feeds-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1.25rem;
   font-size: 0.95rem;
+}
+
+.trending-feeds-label {
   color: var(--text-muted);
+  font-weight: 500;
+}
+
+.trending-feed-link {
+  color: var(--accent);
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.trending-feed-link:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.home-discover {
+  margin: 0;
+}
+
+.home-discover .discover-feed {
+  margin-bottom: 0.75rem;
 }
 
 .discover-feed {
@@ -485,6 +537,49 @@ body {
   margin: 0;
   font-size: 0.95rem;
   color: var(--text-muted);
+}
+
+.forum-discover {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.forum-discover h3 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}
+
+.forum-discover-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.forum-discover-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.forum-discover-card {
+  display: block;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  font-size: 0.95rem;
+}
+
+.forum-discover-card:hover {
+  border-color: var(--accent);
+}
+
+.forum-reply-on-bluesky {
+  margin: 0.75rem 0 0;
 }
 
 .forum-thread-list {
