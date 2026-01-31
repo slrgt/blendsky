@@ -11,7 +11,7 @@ fetch('config.json')
     var API = apiBase && apiBase.replace(/\/$/, '') !== window.location.origin ? apiBase : '';
 
     var versionEl = document.getElementById('app-version');
-    if (versionEl && config && config.version) versionEl.textContent = ' v' + String(config.version);
+    if (versionEl && config && config.version) versionEl.textContent = 'v' + String(config.version);
 
     (function () {
       'use strict';
@@ -574,7 +574,7 @@ fetch('config.json')
     var wrap = document.getElementById('wiki-from-others-feed');
     var loading = document.getElementById('wiki-from-others-loading');
     if (!wrap || !loading) return;
-    var constellationPromise = fetchConstellationLinks(window.location.origin, 'site.standard.document', '.path', 40).then(function (links) {
+    var constellationPromise = fetchConstellationLinks(window.location.origin, 'site.standard.document', '.site', 40).then(function (links) {
       return Promise.all(links.slice(0, 25).map(function (l) {
         return fetchAtRecord(l.uri).then(function (data) {
           var record = data.value || data.record;
@@ -590,7 +590,8 @@ fetch('config.json')
       })).then(function (arr) { return arr.filter(Boolean); });
     }).catch(function () { return []; });
     var wikiSearchPromise = searchPostsBluesky('#blendsky-wiki', 25).then(function (data) {
-      var posts = (data && data.posts) || (data && data.feed) || [];
+      var posts = (data && data.posts) || (data && data.feed) || (data && data.result && data.result.posts) || (Array.isArray(data) ? data : []);
+      if (!Array.isArray(posts)) posts = [];
       return posts.map(function (p) {
         var author = p.author || {};
         var text = (p.record && p.record.text) ? String(p.record.text) : '';
@@ -625,13 +626,17 @@ fetch('config.json')
             var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
             return (
               '<div class="wiki-from-others-card" data-wiki-uri="' + escapeHtml(c.uri) + '">' +
-                '<a href="#" class="wiki-from-others-card-link wiki-from-others-card-lexicon" title="Click to copy AT URI; paste in Forum import to open">' +
+                '<a href="#" class="wiki-from-others-card-link wiki-from-others-card-lexicon" title="Open in Wiki to view and reply">' +
                   '<strong class="wiki-from-others-title">' + escapeHtml(c.title) + '</strong>' +
                   '<p class="wiki-from-others-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
                 '</a>' +
                 '<p class="wiki-from-others-author">' +
                   'By <a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener">@' + escapeHtml(handle) + '</a>' +
                   (c.did ? ' <span class="wiki-from-others-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span>' : '') +
+                '</p>' +
+                '<p class="wiki-from-others-actions">' +
+                  '<button type="button" class="btn btn-ghost btn-sm wiki-from-others-open-btn">Open in Wiki</button> ' +
+                  '<button type="button" class="btn btn-ghost btn-sm wiki-from-others-remix-btn">Remix</button>' +
                 '</p>' +
               '</div>'
             );
@@ -657,14 +662,27 @@ fetch('config.json')
           if (!uri) return;
           a.addEventListener('click', function (e) {
             e.preventDefault();
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(uri).then(function () {
-                var t = a.querySelector('.wiki-from-others-title');
-                if (t) { var orig = t.textContent; t.textContent = 'Copied! Paste in Forum import.'; setTimeout(function () { t.textContent = orig; }, 1500); }
-              });
-            } else {
-              prompt('AT URI (paste in Forum import):', uri);
-            }
+            doImportAndOpenWiki(uri).catch(function (err) { alert('Import failed: ' + (err.message || 'unknown')); });
+          });
+        });
+        wrap.querySelectorAll('.wiki-from-others-open-btn').forEach(function (btn) {
+          var card = btn.closest('.wiki-from-others-card');
+          var uri = card && card.getAttribute('data-wiki-uri');
+          if (!uri) return;
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            doImportAndOpenWiki(uri).catch(function (err) { alert('Import failed: ' + (err.message || 'unknown')); });
+          });
+        });
+        wrap.querySelectorAll('.wiki-from-others-remix-btn').forEach(function (btn) {
+          var card = btn.closest('.wiki-from-others-card');
+          var uri = card && card.getAttribute('data-wiki-uri');
+          if (!uri) return;
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            doRemixWikiFromUri(uri).catch(function (err) { alert('Remix failed: ' + (err.message || 'unknown')); });
           });
         });
       });
@@ -996,7 +1014,13 @@ fetch('config.json')
       return t.id === id;
     });
     if (!thread) return;
+    var discoverEl = document.getElementById('forum-discover');
+    var yourThreadsTitle = document.getElementById('forum-your-threads-title');
+    var importExport = document.querySelector('#view-forum .forum-import-export');
+    if (discoverEl) discoverEl.classList.add('hidden');
+    if (yourThreadsTitle) yourThreadsTitle.classList.add('hidden');
     document.getElementById('forum-thread-list').classList.add('hidden');
+    if (importExport) importExport.classList.add('hidden');
     document.getElementById('forum-thread-view').classList.remove('hidden');
     const detail = document.getElementById('forum-thread-detail');
     var meta = escapeHtml(thread.author || 'Anonymous');
@@ -1022,7 +1046,7 @@ fetch('config.json')
     if (thread.description) {
       body += '<p class="forum-description">' + escapeHtml(thread.description) + '</p>';
     }
-    body += '<div class="forum-reply text forum-body-html">' + bodyToHtml(thread.body || '') + '</div>';
+    body += '<div class="forum-op-label">Original post</div><div class="forum-reply forum-op text forum-body-html">' + bodyToHtml(thread.body || '') + '</div>';
     if (thread.atUri) {
       body += '<p class="forum-at-uri muted"><small>Document: <a href="' + escapeHtml(thread.atUri) + '" target="_blank" rel="noopener">' + escapeHtml(thread.atUri) + '</a></small></p>';
     }
@@ -1056,8 +1080,14 @@ fetch('config.json')
     document.getElementById('forum-reply-form').dataset.threadId = String(id);
     document.getElementById('forum-reply-body').value = '';
     var stdWrap = document.getElementById('forum-thread-standard');
-    stdWrap.classList.remove('hidden');
     stdWrap.dataset.threadId = String(id);
+    if (thread.author === 'You') {
+      stdWrap.classList.remove('hidden');
+    } else {
+      stdWrap.classList.add('hidden');
+    }
+    var threadViewEl = document.getElementById('forum-thread-view');
+    if (threadViewEl) threadViewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   document.getElementById('forum-new-thread').addEventListener('click', function () {
@@ -1160,9 +1190,15 @@ fetch('config.json')
   });
 
   document.getElementById('forum-back').addEventListener('click', function () {
+    var discoverEl = document.getElementById('forum-discover');
+    var yourThreadsTitle = document.getElementById('forum-your-threads-title');
+    var importExport = document.querySelector('#view-forum .forum-import-export');
+    if (discoverEl) discoverEl.classList.remove('hidden');
+    if (yourThreadsTitle) yourThreadsTitle.classList.remove('hidden');
     document.getElementById('forum-thread-list').classList.remove('hidden');
     document.getElementById('forum-thread-view').classList.add('hidden');
     document.getElementById('forum-edit-view').classList.add('hidden');
+    if (importExport) importExport.classList.remove('hidden');
     renderThreadList();
   });
 
@@ -1465,6 +1501,72 @@ fetch('config.json')
       document.getElementById('forum-edit-description').value = newThread.description || '';
       document.getElementById('forum-edit-body').value = newThread.body || '';
       document.getElementById('forum-edit-tags').value = (newThread.tags && newThread.tags.length) ? newThread.tags.join(', ') : '';
+    });
+  }
+
+  /** Import a wiki document by AT URI and open it in the wiki (or open existing if already imported). Returns Promise. */
+  function doImportAndOpenWiki(uri) {
+    var pages = getWikiPages();
+    var existingSlug = Object.keys(pages).find(function (slug) { return pages[slug] && pages[slug].atUri === uri; });
+    if (existingSlug) {
+      openWikiPage(existingSlug);
+      return Promise.resolve();
+    }
+    var req = API
+      ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
+      : fetchAtRecord(uri);
+    return req.then(function (data) {
+      if (typeof BlendskyLexicon === 'undefined' || !BlendskyLexicon.recordToWikiPage) throw new Error('BlendskyLexicon not loaded');
+      var record = data.value || data.record || data;
+      var author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
+      var imported = BlendskyLexicon.recordToWikiPage(record, uri, author);
+      if (!imported) throw new Error('Could not parse document');
+      var slug = imported.slug || slugify(imported.title || 'untitled');
+      var pages = getWikiPages();
+      if (pages[slug] && pages[slug].atUri !== uri) {
+        var rkey = (uri.split('/').pop() || '').slice(-6);
+        slug = slug + '-imported-' + (rkey || Date.now().toString(36));
+      }
+      pages[slug] = {
+        title: imported.title || 'Untitled',
+        body: imported.body || '',
+        atUri: uri,
+        createdBy: imported.createdBy || author || 'AT Protocol'
+      };
+      setWikiPages(pages);
+      renderWikiList();
+      openWikiPage(slug);
+    });
+  }
+
+  /** Remix: fetch wiki document by AT URI, create a new page with "Remixed from" line, open in edit so user can adapt and sync. Returns Promise. */
+  function doRemixWikiFromUri(uri) {
+    var req = API
+      ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
+      : fetchAtRecord(uri);
+    return req.then(function (data) {
+      if (typeof BlendskyLexicon === 'undefined' || !BlendskyLexicon.recordToWikiPage) throw new Error('BlendskyLexicon not loaded');
+      var record = data.value || data.record || data;
+      var author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
+      var imported = BlendskyLexicon.recordToWikiPage(record, uri, author);
+      if (!imported) throw new Error('Could not parse document');
+      var baseTitle = imported.title || 'Untitled';
+      var newTitle = baseTitle + ' (remix)';
+      var newSlug = slugify(newTitle);
+      var pages = getWikiPages();
+      if (pages[newSlug]) newSlug = newSlug + '-remix-' + Date.now().toString(36);
+      var body = 'Remixed from: ' + uri + '\n\n' + (imported.body || '');
+      pages[newSlug] = { title: newTitle, body: body, remixedFrom: uri };
+      setWikiPages(pages);
+      renderWikiList();
+      currentWikiSlug = newSlug;
+      document.getElementById('wiki-title').textContent = newTitle;
+      document.getElementById('wiki-body').innerHTML = simpleMarkdown(body);
+      document.getElementById('wiki-view').classList.add('hidden');
+      document.getElementById('wiki-edit').classList.remove('hidden');
+      document.getElementById('wiki-edit-title').value = newTitle;
+      document.getElementById('wiki-edit-body').value = body;
+      updateWikiStatus(newSlug);
     });
   }
 

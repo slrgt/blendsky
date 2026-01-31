@@ -16,22 +16,25 @@
 </head>
 <body>
   <header class="site-header">
-    <a href="#" class="logo" data-nav="home">
-      <span class="logo-mark">blend</span><span class="logo-dot">sky</span>
-    </a>
-    <p class="tagline">Blender users sharing JSON geometry node setups</p>
-    <nav class="main-nav">
-      <a href="#" class="nav-link" data-nav="wiki">Wiki</a>
-      <a href="#" class="nav-link" data-nav="forum">Forum</a>
-      <a href="#" class="nav-link" data-nav="bluesky">Bluesky</a>
-      <span id="header-login-wrap" class="header-auth-wrap">
-        <a href="#" id="header-login-link" class="nav-link" data-nav="bluesky">Log in</a>
-      </span>
-      <span id="header-user-wrap" class="header-auth-wrap hidden">
-        <span class="header-user-label">Logged in as</span>
-        <a href="#" id="header-user-link" class="nav-link header-user-handle" data-nav="bluesky"></a>
-      </span>
-    </nav>
+    <div class="site-header-main">
+      <a href="#" class="logo" data-nav="home">
+        <span class="logo-mark">blend</span><span class="logo-dot">sky</span>
+      </a>
+      <p class="tagline">Blender users sharing JSON geometry node setups</p>
+      <nav class="main-nav">
+        <a href="#" class="nav-link" data-nav="wiki">Wiki</a>
+        <a href="#" class="nav-link" data-nav="forum">Forum</a>
+        <a href="#" class="nav-link" data-nav="bluesky">Bluesky</a>
+        <span id="header-login-wrap" class="header-auth-wrap">
+          <a href="#" id="header-login-link" class="nav-link" data-nav="bluesky">Log in</a>
+        </span>
+        <span id="header-user-wrap" class="header-auth-wrap hidden">
+          <span class="header-user-label">Logged in as</span>
+          <a href="#" id="header-user-link" class="nav-link header-user-handle" data-nav="bluesky"></a>
+        </span>
+      </nav>
+    </div>
+    <p class="app-version-wrap" aria-label="Blendsky version"><span id="app-version" class="app-version muted"></span></p>
   </header>
 
   <main class="main">
@@ -129,7 +132,7 @@
       </div>
       <div id="wiki-from-others" class="wiki-from-others">
         <h3>Wiki articles from others</h3>
-        <p class="wiki-from-others-hint muted">Articles from others using <strong>Standard.site</strong> (<code>site.standard.document</code>). Author DID and Bluesky profile linked.</p>
+        <p class="wiki-from-others-hint muted">Articles from others who synced to Bluesky from <strong>this app URL</strong> (Standard.site). Click a card or <strong>Open in Wiki</strong> to view and edit; use <strong>Remix</strong> to copy and adapt. Sync your pages to Bluesky so others can see and work on wikis together.</p>
         <div id="wiki-from-others-feed" class="wiki-from-others-feed"><p class="muted" id="wiki-from-others-loading">Loading…</p></div>
       </div>
     </section>
@@ -149,7 +152,7 @@
         <p class="forum-discover-hint muted">Threads from everyone who syncs to Bluesky from <strong>this app URL</strong>. Click a thread to open it (it will be added to your list). Use <strong>Remix</strong> to copy and adapt. If you don’t see others’ threads: sync your own with <strong>Sync to Bluesky</strong>, then click <strong>Refresh</strong>; others using the same URL will see yours too.</p>
         <div id="forum-discover-feed" class="forum-discover-feed"><p class="muted" id="forum-discover-loading">Loading…</p></div>
       </div>
-      <h3 class="forum-your-threads-title">My threads</h3>
+      <h3 id="forum-your-threads-title" class="forum-your-threads-title">My threads</h3>
       <div id="forum-thread-list" class="forum-thread-list"></div>
       <div id="forum-thread-view" class="forum-thread-view hidden">
         <button type="button" id="forum-back" class="btn btn-ghost">← Back to threads</button>
@@ -289,7 +292,7 @@
   </div>
 
   <footer class="site-footer">
-    <p>blendsky — Forum for Blender users sharing JSON geometry node setups<span id="app-version"></span></p>
+    <p>blendsky — Forum for Blender users sharing JSON geometry node setups</p>
   </footer>
 
   <script src="blendsky-lexicon.js"></script>

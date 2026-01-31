@@ -48,12 +48,33 @@ body {
 
 /* Header */
 .site-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
   padding: calc(1.25rem + var(--safe-top)) 1rem 0.75rem;
-  text-align: center;
   border-bottom: 1px solid var(--border);
   background: rgba(250, 249, 247, 0.88);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
+}
+
+.site-header-main {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.app-version-wrap {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.app-version-wrap .app-version:empty::before {
+  content: '—';
+  color: var(--text-muted);
 }
 
 .logo {
@@ -929,6 +950,15 @@ body {
   font-family: monospace;
 }
 
+.wiki-from-others-actions {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.wiki-from-others-actions .btn {
+  margin-right: 0.25rem;
+}
+
 .hidden {
   display: none !important;
 }
@@ -1257,6 +1287,19 @@ body {
 
 .forum-thread-detail-main {
   flex: 1;
+}
+
+.forum-op-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.forum-reply.forum-op {
+  margin-top: 0;
 }
 
 .forum-thread-view .forum-replies {
