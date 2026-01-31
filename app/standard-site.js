@@ -12,11 +12,11 @@
   const NS_DOCUMENT = 'site.standard.document';
   const NS_PUBLICATION = 'site.standard.publication';
 
-  /** site.standard.document record shape for a wiki page (same lexicon as threads/posts) */
+  /** site.standard.document record shape for a wiki page (same lexicon as threads/posts). forkOf for remix/tangled compatibility. */
   function documentFromWikiPage(page, slug, baseUrl) {
     const now = new Date().toISOString();
     const body = page.body || '';
-    return {
+    const doc = {
       $type: NS_DOCUMENT,
       site: baseUrl || (typeof location !== 'undefined' ? location.origin : ''),
       path: '/' + (slug || 'untitled').replace(/^\//, ''),
@@ -28,6 +28,8 @@
       updatedAt: page.updatedAt || now,
       content: body
     };
+    if (page.remixedFrom) doc.forkOf = page.remixedFrom;
+    return doc;
   }
 
   /** site.standard.document record shape (metadata for a post/article) */

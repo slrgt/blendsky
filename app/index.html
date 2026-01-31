@@ -25,6 +25,34 @@
   <main class="main">
     <!-- Landing (home) -->
     <section id="view-home" class="view view-active">
+      <!-- Very top: trending #b3d + Blender/art feeds, powered by Constellation & UFOs -->
+      <div id="home-trending" class="home-trending">
+        <div class="trending-header">
+          <h2 class="trending-title">Trending #b3d & Blender</h2>
+          <p id="trending-meta" class="trending-meta muted">
+            <a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener">Constellation</a> index ·
+            <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a> lexicons
+          </p>
+        </div>
+        <div class="trending-feeds-row">
+          <span class="trending-feeds-label">Feeds:</span>
+          <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener" class="trending-feed-link">#b3d</a>
+          <a href="https://bsky.app/search?q=blender" target="_blank" rel="noopener" class="trending-feed-link">blender</a>
+          <a href="https://bsky.app/search?q=geometry+nodes" target="_blank" rel="noopener" class="trending-feed-link">geometry nodes</a>
+          <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener" class="trending-feed-link">UFOs · what's hot</a>
+          <a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener" class="trending-feed-link">Constellation</a>
+        </div>
+        <div id="home-discover" class="home-discover">
+          <div id="home-discover-feed" class="discover-feed">
+            <p class="muted" id="home-discover-loading">Loading #b3d…</p>
+          </div>
+          <p class="discover-more">
+            <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">More #b3d</a>
+            ·
+            <a href="https://ufos.microcosm.blue/all/" target="_blank" rel="noopener">All collections (UFOs)</a>
+          </p>
+        </div>
+      </div>
       <div class="hero">
         <h1>blendsky</h1>
         <p class="lead">A forum for Blender users sharing JSON geometry node setups. Post node trees, docs, and discuss—then sync to Bluesky so the community can find you.</p>
@@ -45,18 +73,6 @@
           <p>Connect your account and see your feed here. Your wiki and forum posts can sync to Bluesky as threads.</p>
           <a href="#" class="cta" data-nav="bluesky">Connect & view feed</a>
         </article>
-      </div>
-      <div id="home-discover" class="home-discover">
-        <h2>Discover Blender & #b3d</h2>
-        <p class="discover-intro">Recent posts with <strong>#b3d</strong> on Bluesky — find Blender artists and share geometry node JSON. Explore lexicons and trending collections at <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a>.</p>
-        <div id="home-discover-feed" class="discover-feed">
-          <p class="muted" id="home-discover-loading">Loading…</p>
-        </div>
-        <p class="discover-more">
-          <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">Search #b3d on Bluesky</a>
-          ·
-          <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">Explore lexicons (UFOs)</a>
-        </p>
       </div>
       <div id="home-constellation" class="home-constellation hidden">
         <h2>AT Protocol index</h2>
@@ -82,11 +98,13 @@
           <div id="wiki-view" class="wiki-view">
             <h1 id="wiki-title"></h1>
             <p id="wiki-sync-status" class="sync-status" aria-live="polite"></p>
-            <p class="wiki-edits-hint muted"><small>Edits sync to Bluesky — app views like <a href="https://anisota.net" target="_blank" rel="noopener">anisota.net</a> show updated content.</small></p>
+            <p class="wiki-edits-hint muted"><small>Edits sync to Bluesky. Remix = fork (compatible with <a href="https://tangled.org" target="_blank" rel="noopener">tangled.org</a>). Request edit opens Bluesky compose.</small></p>
             <div id="wiki-body" class="wiki-body"></div>
             <div class="wiki-view-actions">
               <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
               <button type="button" id="wiki-sync-bluesky" class="btn btn-secondary">Sync to Bluesky</button>
+              <button type="button" id="wiki-request-edit" class="btn btn-ghost hidden">Request edit</button>
+              <button type="button" id="wiki-remix" class="btn btn-secondary">Remix</button>
             </div>
           </div>
           <div id="wiki-edit" class="wiki-edit hidden">
@@ -105,8 +123,13 @@
     <section id="view-forum" class="view">
       <div class="forum-toolbar">
         <h2>Forum</h2>
-        <p class="forum-tagline">Share JSON geometry node setups, discuss, and sync to Bluesky.</p>
+        <p class="forum-tagline">Share JSON geometry node setups, discuss, and sync to Bluesky. Synced threads get #blendsky-forum so others can find and reply.</p>
         <button type="button" id="forum-new-thread" class="btn btn-primary">New thread</button>
+      </div>
+      <div id="forum-discover" class="forum-discover">
+        <h3>Discover forum threads</h3>
+        <p class="forum-discover-hint muted">Posts with <strong>#blendsky-forum</strong> or <strong>#b3d</strong>. Reply on Bluesky; to add a thread here, paste its AT URI or pckt.blog URL above.</p>
+        <div id="forum-discover-feed" class="forum-discover-feed"><p class="muted" id="forum-discover-loading">Loading…</p></div>
       </div>
       <div id="forum-thread-list" class="forum-thread-list"></div>
       <div id="forum-thread-view" class="forum-thread-view hidden">
