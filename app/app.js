@@ -93,7 +93,10 @@ fetch('config.json')
       ? keys
           .map(function (slug) {
             const title = pages[slug].title || slug;
-            return '<li><a href="#" data-wiki-slug="' + slug + '">' + escapeHtml(title) + '</a></li>';
+            const page = pages[slug];
+            const status = syncingWikiSlug === slug ? 'syncing' : (page.atUri ? 'synced' : 'local');
+            const badge = '<span class="sync-badge sync-' + status + '" data-wiki-status="' + status + '">' + (status === 'syncing' ? 'Syncing…' : status === 'synced' ? 'Synced' : 'Local') + '</span>';
+            return '<li><a href="#" data-wiki-slug="' + slug + '">' + escapeHtml(title) + '</a> ' + badge + '</li>';
           })
           .join('')
       : '<li class="muted">No pages yet. Create one above.</li>';
@@ -120,6 +123,22 @@ fetch('config.json')
     document.getElementById('wiki-body').innerHTML = simpleMarkdown(page.body || '');
     document.getElementById('wiki-view').classList.remove('hidden');
     document.getElementById('wiki-edit').classList.add('hidden');
+    updateWikiStatus(slug);
+  }
+
+  function updateWikiStatus(slug) {
+    var el = document.getElementById('wiki-sync-status');
+    if (!el) return;
+    if (!slug) {
+      el.textContent = '';
+      el.className = 'sync-status';
+      return;
+    }
+    var pages = getWikiPages();
+    var page = pages[slug];
+    var status = syncingWikiSlug === slug ? 'syncing' : (page && page.atUri ? 'synced' : 'local');
+    el.className = 'sync-status sync-' + status;
+    el.textContent = status === 'syncing' ? 'Syncing…' : status === 'synced' ? 'Synced to Bluesky' : 'Local only';
   }
 
   function initWiki() {
@@ -129,6 +148,7 @@ fetch('config.json')
     if (firstSlug) openWikiPage(firstSlug);
     else {
       currentWikiSlug = null;
+      updateWikiStatus(null);
       document.getElementById('wiki-title').textContent = '';
       document.getElementById('wiki-body').innerHTML = '<p class="muted">Create a page or pick one from the list.</p>';
       document.getElementById('wiki-view').classList.remove('hidden');
@@ -169,6 +189,19 @@ fetch('config.json')
     document.getElementById('wiki-body').innerHTML = simpleMarkdown(body);
     document.getElementById('wiki-edit').classList.add('hidden');
     document.getElementById('wiki-view').classList.remove('hidden');
+    updateWikiStatus(newSlug);
+    var session = getStoredSession();
+    if (session && session.accessJwt && typeof StandardSite !== 'undefined') {
+      syncingWikiSlug = newSlug;
+      updateWikiStatus(newSlug);
+      doSyncWikiPage(newSlug).then(function () {
+        renderWikiList();
+        updateWikiStatus(newSlug);
+      }).catch(function (err) {
+        updateWikiStatus(newSlug);
+        if (err && err.message) alert('Sync failed: ' + err.message);
+      });
+    }
   });
 
   document.getElementById('wiki-cancel').addEventListener('click', function () {
@@ -179,33 +212,33 @@ fetch('config.json')
   });
 
   document.getElementById('wiki-sync-bluesky').addEventListener('click', function () {
-    if (!currentWikiSlug) return;
-    var pages = getWikiPages();
-    var page = pages[currentWikiSlug];
-    if (!page || typeof StandardSite === 'undefined') return;
+    if (!currentWikiSlug) {
+      alert('Open or create a page first.');
+      return;
+    }
     var session = getStoredSession();
     if (!session || !session.accessJwt) {
       alert('Connect your Bluesky account first (Bluesky tab).');
       return;
     }
+    if (typeof StandardSite === 'undefined') {
+      alert('Standard.site script not loaded.');
+      return;
+    }
     var btn = this;
     btn.disabled = true;
-    btn.textContent = 'Syncing…';
-    var baseUrl = typeof location !== 'undefined' ? location.origin : '';
-    var record = StandardSite.documentFromWikiPage(page, currentWikiSlug, baseUrl);
-    var rkey = sanitizeRkey(currentWikiSlug);
-    putRecordToBluesky(StandardSite.NS_DOCUMENT, rkey, record)
-      .then(function (res) {
-        page.atUri = res.uri;
-        page.updatedAt = new Date().toISOString();
-        pages[currentWikiSlug] = page;
-        setWikiPages(pages);
-        btn.textContent = 'Synced to Bluesky';
+    syncingWikiSlug = currentWikiSlug;
+    updateWikiStatus(currentWikiSlug);
+    doSyncWikiPage(currentWikiSlug)
+      .then(function () {
+        renderWikiList();
+        updateWikiStatus(currentWikiSlug);
+        btn.textContent = 'Synced';
         setTimeout(function () { btn.textContent = 'Sync to Bluesky'; }, 2000);
       })
       .catch(function (err) {
+        updateWikiStatus(currentWikiSlug);
         alert('Sync failed: ' + (err.message || 'unknown'));
-        btn.textContent = 'Sync to Bluesky';
       })
       .then(function () { btn.disabled = false; });
   });
@@ -256,6 +289,8 @@ fetch('config.json')
             .slice()
             .reverse()
             .map(function (t) {
+              var status = syncingForumId === t.id ? 'syncing' : (t.atUri ? 'synced' : 'local');
+              var badge = '<span class="sync-badge sync-' + status + '">' + (status === 'syncing' ? 'Syncing…' : status === 'synced' ? 'Synced' : 'Local') + '</span>';
               return (
                 '<a href="#" class="forum-thread-card" data-thread-id="' +
                 t.id +
@@ -265,7 +300,9 @@ fetch('config.json')
                 escapeHtml(t.author || 'Anonymous') +
                 ' · ' +
                 (t.replies ? t.replies.length : 0) +
-                ' replies</span></a>'
+                ' replies</span> ' +
+                badge +
+                '</a>'
               );
             })
             .join('');
@@ -295,7 +332,8 @@ fetch('config.json')
         return '<span class="forum-tag">' + escapeHtml(tag) + '</span>';
       }).join(' ');
     }
-    var body = '<h2>' + escapeHtml(thread.title) + '</h2><p class="meta">' + meta + '</p>';
+    var threadStatus = syncingForumId === id ? 'Syncing…' : (thread.atUri ? 'Synced to Bluesky' : 'Local only');
+    var body = '<h2>' + escapeHtml(thread.title) + '</h2><p class="meta">' + meta + '</p><p class="sync-status sync-' + (thread.atUri ? 'synced' : 'local') + '" id="forum-thread-sync-status">' + escapeHtml(threadStatus) + '</p>';
     if (thread.description) {
       body += '<p class="forum-description">' + escapeHtml(thread.description) + '</p>';
     }
@@ -366,6 +404,16 @@ fetch('config.json')
     document.getElementById('forum-new-view').classList.add('hidden');
     renderThreadList();
     openThread(id);
+    var session = getStoredSession();
+    if (session && session.accessJwt && typeof StandardSite !== 'undefined') {
+      doSyncForumThread(id).then(function () {
+        renderThreadList();
+        openThread(id);
+      }).catch(function (err) {
+        openThread(id);
+        if (err && err.message) alert('Sync failed: ' + err.message);
+      });
+    }
   });
 
   document.getElementById('forum-back').addEventListener('click', function () {
@@ -411,31 +459,30 @@ fetch('config.json')
     var id = wrap && wrap.dataset.threadId ? Number(wrap.dataset.threadId) : null;
     var data = getForumData();
     var thread = data.threads.find(function (t) { return t.id === id; });
-    if (id == null || !thread || typeof StandardSite === 'undefined') return;
+    if (id == null || !thread) return;
     var session = getStoredSession();
     if (!session || !session.accessJwt) {
       alert('Connect your Bluesky account first (Bluesky tab).');
       return;
     }
+    if (typeof StandardSite === 'undefined') {
+      alert('Standard.site script not loaded.');
+      return;
+    }
     var btn = this;
     btn.disabled = true;
-    btn.textContent = 'Syncing…';
-    var baseUrl = typeof location !== 'undefined' ? location.origin : '';
-    var doc = StandardSite.documentFromThread(thread, baseUrl);
-    var record = { $type: StandardSite.NS_DOCUMENT, ...doc, content: thread.body || '' };
-    var rkey = sanitizeRkey(thread.path || 'thread-' + thread.id);
-    putRecordToBluesky(StandardSite.NS_DOCUMENT, rkey, record)
-      .then(function (res) {
-        thread.atUri = res.uri;
-        thread.updatedAt = new Date().toISOString();
-        setForumData(data);
+    var statusEl = document.getElementById('forum-thread-sync-status');
+    if (statusEl) { statusEl.textContent = 'Syncing…'; statusEl.className = 'sync-status sync-syncing'; }
+    doSyncForumThread(id)
+      .then(function () {
+        renderThreadList();
         openThread(id);
-        btn.textContent = 'Synced to Bluesky';
+        btn.textContent = 'Synced';
         setTimeout(function () { btn.textContent = 'Sync to Bluesky'; }, 2000);
       })
       .catch(function (err) {
+        openThread(id);
         alert('Sync failed: ' + (err.message || 'unknown'));
-        btn.textContent = 'Sync to Bluesky';
       })
       .then(function () { btn.disabled = false; });
   });
@@ -544,7 +591,9 @@ fetch('config.json')
     });
   }
 
-  /** Put a site.standard.document (or other record) into the logged-in user's Bluesky repo. */
+  var BSKY_POST_MAX = 300;
+
+  /** Put a record (with rkey) into the logged-in user's Bluesky repo. */
   function putRecordToBluesky(collection, rkey, record) {
     var session = getStoredSession();
     if (!session || !session.accessJwt || !session.pdsUrl) return Promise.reject(new Error('Not connected to Bluesky'));
@@ -569,9 +618,173 @@ fetch('config.json')
     });
   }
 
+  /** Create a record (rkey auto-generated) in the logged-in user's Bluesky repo. Returns { uri, cid }. */
+  function createRecordToBluesky(collection, record) {
+    var session = getStoredSession();
+    if (!session || !session.accessJwt || !session.pdsUrl) return Promise.reject(new Error('Not connected to Bluesky'));
+    return ensureSessionDid(session).then(function (s) {
+      var url = s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.repo.createRecord';
+      return fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + s.accessJwt
+        },
+        body: JSON.stringify({
+          repo: s.did,
+          collection: collection,
+          record: record
+        })
+      }).then(function (res) {
+        if (!res.ok) return res.json().then(function (err) { throw new Error(err.message || err.error || res.statusText); });
+        return res.json();
+      });
+    });
+  }
+
   /** Sanitize string for use as AT record rkey (alphanumeric, dots, underscores, hyphens). */
   function sanitizeRkey(s) {
     return String(s).replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'untitled';
+  }
+
+  /** Strip markdown to plain text (rough). */
+  function stripMarkdown(text) {
+    if (!text) return '';
+    return String(text)
+      .replace(/\n#{1,6}\s+/g, '\n')
+      .replace(/#{1,6}\s+/g, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  /** Split text into chunks by sentence boundaries, each chunk <= maxLen. */
+  function splitSentences(text, maxLen) {
+    if (!text || maxLen < 1) return [];
+    var plain = stripMarkdown(text).trim();
+    if (!plain) return [];
+    var sentences = plain.split(/(?<=[.!?])\s+|\n+/).filter(Boolean);
+    var chunks = [];
+    var current = '';
+    for (var i = 0; i < sentences.length; i++) {
+      var s = sentences[i];
+      if (current.length + s.length + (current ? 1 : 0) <= maxLen) {
+        current = current ? current + ' ' + s : s;
+      } else {
+        if (current) chunks.push(current);
+        if (s.length > maxLen) {
+          while (s.length > maxLen) {
+            chunks.push(s.slice(0, maxLen));
+            s = s.slice(maxLen).trim();
+          }
+          current = s;
+        } else {
+          current = s;
+        }
+      }
+    }
+    if (current) chunks.push(current);
+    return chunks;
+  }
+
+  /** Create a single feed post or a thread (replies). Returns promise that resolves to { postUris }. */
+  function postFeedTextOrThread(text) {
+    var chunks = splitSentences(text, BSKY_POST_MAX);
+    if (chunks.length === 0) return Promise.resolve({ postUris: [] });
+    var now = new Date().toISOString();
+    function makePost(txt, replyRef) {
+      var rec = { $type: 'app.bsky.feed.post', text: txt, createdAt: now };
+      if (replyRef) rec.reply = replyRef;
+      return rec;
+    }
+    return createRecordToBluesky('app.bsky.feed.post', makePost(chunks[0], null))
+      .then(function (first) {
+        var uris = [first.uri];
+        var root = { uri: first.uri, cid: first.cid };
+        var parent = { uri: first.uri, cid: first.cid };
+        var chain = Promise.resolve(first);
+        for (var i = 1; i < chunks.length; i++) {
+          (function (idx) {
+            chain = chain.then(function (prev) {
+              var ref = { root: root, parent: { uri: prev.uri, cid: prev.cid } };
+              return createRecordToBluesky('app.bsky.feed.post', makePost(chunks[idx], ref));
+            }).then(function (res) {
+              uris.push(res.uri);
+              return res;
+            });
+          })(i);
+        }
+        return chain.then(function () { return { postUris: uris }; });
+      });
+  }
+
+  /** Build full plain text for feed (title + body) and post as one or thread. */
+  function postContentAsFeed(title, body) {
+    var full = (title ? title + '\n\n' : '') + (body || '');
+    var text = full.trim() || 'Posted from blendsky';
+    return postFeedTextOrThread(text);
+  }
+
+  var syncingWikiSlug = null;
+  var syncingForumId = null;
+
+  /** Full sync: put site.standard.document + post feed (single or thread). Updates page.atUri. */
+  function doSyncWikiPage(slug) {
+    var pages = getWikiPages();
+    var page = pages[slug];
+    if (!page || typeof StandardSite === 'undefined') return Promise.resolve();
+    var session = getStoredSession();
+    if (!session || !session.accessJwt) return Promise.resolve();
+    syncingWikiSlug = slug;
+    var baseUrl = typeof location !== 'undefined' ? location.origin : '';
+    var record = StandardSite.documentFromWikiPage(page, slug, baseUrl);
+    var rkey = sanitizeRkey(slug);
+    return putRecordToBluesky(StandardSite.NS_DOCUMENT, rkey, record)
+      .then(function (res) {
+        page.atUri = res.uri;
+        page.updatedAt = new Date().toISOString();
+        return postContentAsFeed(page.title, page.body);
+      })
+      .then(function () {
+        pages[slug] = page;
+        setWikiPages(pages);
+      })
+      .catch(function (err) {
+        if (err && err.message) console.error('Wiki sync:', err.message);
+        throw err;
+      })
+      .then(function () { syncingWikiSlug = null; }, function () { syncingWikiSlug = null; });
+  }
+
+  /** Full sync: put site.standard.document + post feed (single or thread). Updates thread.atUri. */
+  function doSyncForumThread(threadId) {
+    var data = getForumData();
+    var thread = data.threads.find(function (t) { return t.id === threadId; });
+    if (!thread || typeof StandardSite === 'undefined') return Promise.resolve();
+    var session = getStoredSession();
+    if (!session || !session.accessJwt) return Promise.resolve();
+    syncingForumId = threadId;
+    var baseUrl = typeof location !== 'undefined' ? location.origin : '';
+    var doc = StandardSite.documentFromThread(thread, baseUrl);
+    var record = { $type: StandardSite.NS_DOCUMENT, ...doc, content: thread.body || '' };
+    var rkey = sanitizeRkey(thread.path || 'thread-' + thread.id);
+    return putRecordToBluesky(StandardSite.NS_DOCUMENT, rkey, record)
+      .then(function (res) {
+        thread.atUri = res.uri;
+        thread.updatedAt = new Date().toISOString();
+        return postContentAsFeed(thread.title, thread.body);
+      })
+      .then(function () {
+        setForumData(data);
+      })
+      .catch(function (err) {
+        if (err && err.message) console.error('Forum sync:', err.message);
+        throw err;
+      })
+      .then(function () { syncingForumId = null; }, function () { syncingForumId = null; });
   }
 
   function renderBlueskyFeed(items, append) {

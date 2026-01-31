@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>blendsky — wikis, forums & your Bluesky feed</title>
+  <title>blendsky — Forum for Blender users sharing JSON geometry node setups</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet" />
@@ -14,7 +14,7 @@
     <a href="#" class="logo" data-nav="home">
       <span class="logo-mark">blend</span><span class="logo-dot">sky</span>
     </a>
-    <p class="tagline">wikis, forums & the people you follow</p>
+    <p class="tagline">Blender users sharing JSON geometry node setups</p>
     <nav class="main-nav">
       <a href="#" class="nav-link" data-nav="wiki">Wiki</a>
       <a href="#" class="nav-link" data-nav="forum">Forum</a>
@@ -26,34 +26,34 @@
     <!-- Landing (home) -->
     <section id="view-home" class="view view-active">
       <div class="hero">
-        <h1>What is blendsky?</h1>
-        <p class="lead">A simple place to grow wikis, join forums, and keep your Bluesky feed from the people you follow in one spot.</p>
+        <h1>blendsky</h1>
+        <p class="lead">A forum for Blender users sharing JSON geometry node setups. Post node trees, docs, and discuss—then sync to Bluesky so the community can find you.</p>
       </div>
       <div class="features">
         <article class="feature">
-          <h2>Build wikis</h2>
-          <p>Create and edit pages together. Focus on content, not setup.</p>
+          <h2>Wiki</h2>
+          <p>Document your geometry node setups. Write guides, notes, and reference pages in Markdown.</p>
           <a href="#" class="cta" data-nav="wiki">Go to Wiki</a>
         </article>
         <article class="feature">
-          <h2>Join the forum</h2>
-          <p>Start threads, reply, and discuss. Your community, your topics.</p>
+          <h2>Forum</h2>
+          <p>Share JSON geometry node setups, start threads, and reply. Import/export standard.site documents and sync to Bluesky.</p>
           <a href="#" class="cta" data-nav="forum">Go to Forum</a>
         </article>
         <article class="feature">
-          <h2>Your Bluesky feed</h2>
-          <p>See posts from everyone you follow on Bluesky, right here—powered by your timeline.</p>
+          <h2>Bluesky</h2>
+          <p>Connect your account and see your feed here. Your wiki and forum posts can sync to Bluesky as threads.</p>
           <a href="#" class="cta" data-nav="bluesky">Connect & view feed</a>
         </article>
       </div>
-      <p class="ready">Ready to start?</p>
-      <p class="sub">Pick <strong>Wiki</strong>, <strong>Forum</strong>, or <strong>Bluesky</strong> above.</p>
+      <p class="ready">Ready to share?</p>
+      <p class="sub">Use <strong>Wiki</strong> for docs, <strong>Forum</strong> for JSON node setups and discussion, and <strong>Bluesky</strong> to connect.</p>
     </section>
 
     <!-- Wiki -->
     <section id="view-wiki" class="view">
       <div class="wiki-toolbar">
-        <input type="text" id="wiki-search" class="wiki-search" placeholder="Search or create page…" />
+        <input type="text" id="wiki-search" class="wiki-search" placeholder="Search or create page (e.g. node setup docs)…" />
         <button type="button" id="wiki-new" class="btn btn-primary">New page</button>
       </div>
       <div class="wiki-content">
@@ -64,6 +64,7 @@
         <article class="wiki-main">
           <div id="wiki-view" class="wiki-view">
             <h1 id="wiki-title"></h1>
+            <p id="wiki-sync-status" class="sync-status" aria-live="polite"></p>
             <div id="wiki-body" class="wiki-body"></div>
             <div class="wiki-view-actions">
               <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
@@ -86,6 +87,7 @@
     <section id="view-forum" class="view">
       <div class="forum-toolbar">
         <h2>Forum</h2>
+        <p class="forum-tagline">Share JSON geometry node setups, discuss, and sync to Bluesky.</p>
         <button type="button" id="forum-new-thread" class="btn btn-primary">New thread</button>
       </div>
       <div id="forum-thread-list" class="forum-thread-list"></div>
@@ -111,7 +113,7 @@
           <input type="text" id="forum-new-title" placeholder="Thread title (required)" required />
           <input type="text" id="forum-new-path" class="forum-optional" placeholder="Path/slug (e.g. /my-post)" />
           <textarea id="forum-new-description" class="forum-optional" placeholder="Short description (standard.site)" rows="2"></textarea>
-          <textarea id="forum-new-body" placeholder="First post…" rows="5" required></textarea>
+          <textarea id="forum-new-body" placeholder="Paste JSON geometry node setup or write your post…" rows="5" required></textarea>
           <input type="text" id="forum-new-tags" class="forum-optional" placeholder="Tags, comma-separated" />
           <button type="submit" class="btn btn-primary">Create thread</button>
         </form>
@@ -152,7 +154,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>blendsky — wikis, forums & your Bluesky feed</p>
+    <p>blendsky — Forum for Blender users sharing JSON geometry node setups</p>
   </footer>
 
   <script src="standard-site.js"></script>

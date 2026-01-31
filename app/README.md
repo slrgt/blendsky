@@ -1,11 +1,11 @@
 # blendsky
 
-A pckt.blog-style UI for **wikis**, **forums**, and your **Bluesky feed** (posts from everyone you follow).
+A forum for **Blender users sharing JSON geometry node setups.** pckt.blog-style UI: **Wiki**, **Forum**, and your **Bluesky feed** in one place.
 
 ## What’s in it
 
-- **Wiki** — Create and edit pages. Search or create by title. Simple Markdown (headers, bold, links, code). Data is stored in your browser (localStorage).
-- **Forum** — New threads, replies, back to list. **Compatible with [standard.site](https://standard.site/) and [atcute](https://tangled.org/mary.my.id/atcute)** (@atcute/standard-site, @atcute/pckt): threads use the same document shape (title, path, description, tags, publishedAt, updatedAt). Export a thread as a standard.site document (JSON) or **import** from an AT URI (`at://…/site.standard.document/…`). Works with pckt.blog, Leaflet, and other atcute-based apps. All stored in localStorage.
+- **Wiki** — Document your geometry node setups. Create and edit pages, search or create by title. Simple Markdown (headers, bold, links, code). Data is stored in your browser (localStorage).
+- **Forum** — Share JSON geometry node setups, new threads, replies. **Compatible with [standard.site](https://standard.site/) and [atcute](https://tangled.org/mary.my.id/atcute)** (@atcute/standard-site, @atcute/pckt): threads use the same document shape (title, path, description, tags, publishedAt, updatedAt). Export a thread as a standard.site document (JSON) or **import** from an AT URI (`at://…/site.standard.document/…`). Works with pckt.blog, Leaflet, and other atcute-based apps. All stored in localStorage.
 - **Bluesky** — **OAuth** (same flow as pckt.blog): enter your handle, sign in on Bluesky, approve access. No app password. Your **timeline** (posts from people you follow) loads here.
 
 ## Run with OAuth (recommended)

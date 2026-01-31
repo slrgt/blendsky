@@ -356,8 +356,10 @@ body {
 /* Forum */
 .forum-toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
   margin-bottom: 1.5rem;
 }
 
@@ -365,6 +367,13 @@ body {
   font-family: var(--font-serif);
   font-size: 1.35rem;
   margin: 0;
+}
+
+.forum-tagline {
+  width: 100%;
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
 }
 
 .forum-thread-list {
@@ -649,4 +658,39 @@ body {
 .muted {
   color: var(--text-muted);
   font-size: 0.95rem;
+}
+
+/* Sync status: Local / Synced / Syncing… */
+.sync-status {
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+}
+.sync-status.sync-local {
+  color: var(--text-muted);
+}
+.sync-status.sync-synced {
+  color: var(--accent);
+}
+.sync-status.sync-syncing {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.sync-badge {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  margin-left: 0.35rem;
+}
+.sync-badge.sync-local {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+.sync-badge.sync-synced {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+.sync-badge.sync-syncing {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-style: italic;
 }
