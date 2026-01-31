@@ -854,17 +854,6 @@ fetch('config.json')
     window.open(url, '_blank', 'noopener');
   });
 
-  document.getElementById('wiki-suggest-edit').addEventListener('click', function () {
-    if (!currentWikiSlug) return;
-    var pages = getWikiPages();
-    var page = pages[currentWikiSlug];
-    if (!page || !page.atUri) return;
-    var title = page.title || 'Untitled';
-    var text = 'I suggested an edit to your wiki article "' + title + '". Link: ' + page.atUri + ' — Paste your suggested change below.';
-    var url = 'https://bsky.app/intent/compose?text=' + encodeURIComponent(text);
-    window.open(url, '_blank', 'noopener');
-  });
-
   document.getElementById('wiki-remix').addEventListener('click', function () {
     if (!currentWikiSlug) return;
     var pages = getWikiPages();
@@ -885,6 +874,27 @@ fetch('config.json')
     document.getElementById('wiki-edit-body').value = newPage.body;
     document.getElementById('wiki-view').classList.add('hidden');
     document.getElementById('wiki-edit').classList.remove('hidden');
+  });
+
+  document.getElementById('wiki-request-edit').addEventListener('click', function () {
+    if (!currentWikiSlug) return;
+    var pages = getWikiPages();
+    var page = pages[currentWikiSlug];
+    if (!page || !page.atUri) return;
+    var text = 'Requesting edit access to "' + (page.title || 'Untitled') + '": ' + page.atUri;
+    var url = 'https://bsky.app/intent/compose?text=' + encodeURIComponent(text);
+    window.open(url, '_blank', 'noopener');
+  });
+
+  document.getElementById('wiki-suggest-edit').addEventListener('click', function () {
+    if (!currentWikiSlug) return;
+    var pages = getWikiPages();
+    var page = pages[currentWikiSlug];
+    if (!page || !page.atUri) return;
+    var title = page.title || 'Untitled';
+    var text = 'I suggested an edit to your wiki article "' + title + '". Link: ' + page.atUri + ' — Paste your suggested change below.';
+    var url = 'https://bsky.app/intent/compose?text=' + encodeURIComponent(text);
+    window.open(url, '_blank', 'noopener');
   });
 
   document.getElementById('wiki-reply-form').addEventListener('submit', function (e) {
