@@ -1398,9 +1398,10 @@ fetch('config.json')
     return fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'blendsky/1.0' } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        var links = (data && data.links) || (data && data.sources) || (data && data.records) || (Array.isArray(data) ? data : []);
+        var links = (data && data.links) || (data && data.sources) || (data && data.records) || (data && data.links && data.links.items) || (Array.isArray(data) ? data : []);
+        if (!Array.isArray(links)) links = [];
         return links.map(function (l) {
-          var uri = (l && (l.source_uri || l.uri || (l.source && l.source.uri) || (l.source && l.source.record_uri))) || (typeof l === 'string' ? l : '');
+          var uri = (l && (l.source_uri || l.uri || l.record_uri || l.link_uri || (l.source && l.source.uri) || (l.source && l.source.record_uri))) || (typeof l === 'string' ? l : '');
           var did = (uri && uri.indexOf('at://') === 0) ? uri.split('/')[2] : '';
           return { uri: uri, did: did };
         }).filter(function (x) { return x.uri && x.uri.indexOf('at://') === 0; });
@@ -1436,14 +1437,39 @@ fetch('config.json')
         }).catch(function () { return null; });
       })).then(function (arr) { return arr.filter(Boolean); });
     });
-    var feedPromise = searchPostsBluesky('#blendsky-forum', 25).then(function (data) {
-      var posts = (data && data.posts) || (data && data.feed) || [];
-      return { cards: posts.map(function (p) {
-        var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 160) : '';
-        if (text.length === 160) text += '…';
-        var sortAt = new Date((p.record && p.record.createdAt) || 0).getTime();
-        return { _type: 'feed', post: p, snippet: text, sortAt: sortAt };
-      }), searchFailed: false };
+    // Bluesky search: try both hashtag and plain term; merge and dedupe by post URI so we show all synced threads.
+    function parseSearchPosts(data) {
+      var posts = (data && data.posts) || (data && data.feed) || (data && data.result && data.result.posts) || (Array.isArray(data) ? data : []);
+      return Array.isArray(posts) ? posts : [];
+    }
+    var feedPromise = Promise.all([
+      searchPostsBluesky('#blendsky-forum', 30).then(parseSearchPosts).catch(function () { return []; }),
+      searchPostsBluesky('blendsky-forum', 30).then(parseSearchPosts).catch(function () { return []; })
+    ]).then(function (results) {
+      var seen = {};
+      var merged = [];
+      results.forEach(function (posts) {
+        posts.forEach(function (p) {
+          var uri = p && p.uri;
+          if (!uri || seen[uri]) return;
+          seen[uri] = true;
+          merged.push(p);
+        });
+      });
+      merged.sort(function (a, b) {
+        var ta = (a.record && a.record.createdAt) ? new Date(a.record.createdAt).getTime() : 0;
+        var tb = (b.record && b.record.createdAt) ? new Date(b.record.createdAt).getTime() : 0;
+        return tb - ta;
+      });
+      return {
+        cards: merged.slice(0, 40).map(function (p) {
+          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 160) : '';
+          if (text.length === 160) text += '…';
+          var sortAt = new Date((p.record && p.record.createdAt) || 0).getTime();
+          return { _type: 'feed', post: p, snippet: text, sortAt: sortAt };
+        }),
+        searchFailed: false
+      };
     }).catch(function (err) {
       return { cards: [], searchFailed: true };
     });
@@ -1526,10 +1552,12 @@ fetch('config.json')
           var session = getStoredSession();
           var needLogin = !session || !session.accessJwt;
           var msg = needLogin && searchFailed
-            ? 'Connect your Bluesky account (Log in, top right), then click <strong>Refresh</strong> to load forum posts from others who use this app URL.'
+            ? 'Community threads are loaded by searching Bluesky for #blendsky-forum. <strong>Log in with Bluesky</strong> (top right), then click <strong>Refresh</strong> so the app can search and show everyone’s synced threads.'
             : needLogin
-              ? 'Connect your Bluesky account (Log in, top right), then click Refresh. You’ll see threads from everyone who syncs from this same app URL.'
-              : 'No threads from others yet. Create a thread under <strong>My threads</strong>, then use <strong>Sync to Bluesky</strong> on it. Others visiting this same app URL will see it in Community forum after they click Refresh. Or paste an AT URI below to import a thread.';
+              ? 'Community threads come from Bluesky search (#blendsky-forum). <strong>Log in with Bluesky</strong> (top right), then click Refresh to see threads from all accounts that have synced.'
+              : searchFailed
+                ? 'Search failed. Check your connection and try <strong>Refresh</strong>. You can also paste an AT URI below to import a thread.'
+                : 'No threads from others yet. Each account must click <strong>Sync to Bluesky</strong> on their thread (under My threads). Threads then appear here for everyone who’s logged in. If you just synced, wait a minute and click Refresh. Or paste an AT URI below to import.';
           wrap.innerHTML = '<p class="muted forum-discover-empty">' + msg + '</p><p class="forum-discover-refresh-wrap"><button type="button" class="btn btn-ghost forum-discover-refresh" id="forum-discover-refresh">Refresh community posts</button></p>';
           var refreshBtn = wrap.querySelector('#forum-discover-refresh');
           if (refreshBtn) refreshBtn.addEventListener('click', function () { loadForumDiscover(); });
