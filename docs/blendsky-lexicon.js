@@ -63,6 +63,22 @@
     return 'at://' + repo + '/' + collection + '/' + rkey;
   }
 
+  /** Convert fetched site.standard.document into a wiki page for display. path: /wiki/slug -> slug. */
+  function recordToWikiPage(record, uri, author) {
+    if (!record || typeof record !== 'object') return null;
+    var path = (record.path && record.path.replace(/^\//, '')) || '';
+    var slug = path.replace(/^wiki\/?/, '') || 'untitled';
+    slug = slug.replace(/[^a-z0-9-_]/gi, '-').replace(/^-|-$/g, '') || 'untitled';
+    return {
+      title: record.title || 'Untitled',
+      body: record.content || record.textContent || '',
+      slug: slug,
+      atUri: uri,
+      createdBy: author || 'AT Protocol',
+      _imported: true
+    };
+  }
+
   /** Convert fetched site.standard.document (or legacy app.blendsky.document) into a forum thread for display */
   function recordToThread(record, uri, author) {
     if (!record || typeof record !== 'object') return null;
@@ -93,6 +109,7 @@
     threadToDocumentShape: threadToDocumentShape,
     parseAtUri: parseAtUri,
     atUri: atUri,
+    recordToWikiPage: recordToWikiPage,
     recordToThread: recordToThread
   };
 })(typeof window !== 'undefined' ? window : typeof self !== 'undefined' ? self : this);
