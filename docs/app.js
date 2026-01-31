@@ -556,6 +556,24 @@ fetch('config.json')
       if (updatedAt) parts.push('Last edited by ' + escapeHtml(updatedBy) + ' at ' + new Date(updatedAt).toLocaleString());
       bylineEl.textContent = parts.join(' · ');
       bylineEl.style.display = 'block';
+      if (page.atUri && (createdBy === 'Local' || createdBy === 'AT Protocol' || !createdBy || createdBy === 'AT')) {
+        var did = page.atUri.indexOf('at://') === 0 ? page.atUri.split('/')[2] : '';
+        if (did) {
+          getProfileByDid(did).then(function (profile) {
+            if (!bylineEl) return;
+            var handle = (profile && profile.handle) || did;
+            var authorLabel = '@' + handle;
+            var parts = ['Author: ' + escapeHtml(authorLabel), 'Version ' + versionStr];
+            if (updatedAt) parts.push('Last edited by ' + escapeHtml(updatedBy) + ' at ' + new Date(updatedAt).toLocaleString());
+            bylineEl.textContent = parts.join(' · ');
+            var pages = getWikiPages();
+            if (pages[slug] && pages[slug].atUri === page.atUri) {
+              pages[slug].createdBy = authorLabel;
+              setWikiPages(pages);
+            }
+          });
+        }
+      }
     }
     document.getElementById('wiki-view').classList.remove('hidden');
     document.getElementById('wiki-edit').classList.add('hidden');
@@ -1263,44 +1281,39 @@ fetch('config.json')
     }
   }
 
+  /** Open a Bluesky-only (feed) post from Community. By default imports it as a local thread so the user can reply immediately. */
   function openForumGuestPost(data) {
-    updateDocumentVerificationLink(null);
-    lastForumTab = 'community';
-    currentForumGuestPost = data || null;
-    var discoverEl = document.getElementById('forum-discover');
-    var minePane = document.getElementById('forum-my-threads-pane');
-    var importExport = document.querySelector('#view-forum .forum-import-export');
-    if (discoverEl) discoverEl.classList.add('hidden');
-    if (minePane) minePane.classList.add('hidden');
-    document.getElementById('forum-thread-list').classList.add('hidden');
-    if (importExport) importExport.classList.add('hidden');
-    document.getElementById('forum-thread-view').classList.remove('hidden');
-    var text = (data && data.fullText) ? String(data.fullText) : '';
+    if (!data || !data.postUri) return;
+    var forumData = getForumData();
+    var existing = forumData.threads.find(function (t) { return t.feedPostUri === data.postUri; });
+    if (existing) {
+      openThread(existing.id);
+      lastForumTab = 'community';
+      return;
+    }
+    var text = (data.fullText) ? String(data.fullText) : '';
     var firstLine = text.split('\n')[0] || text;
     var title = firstLine.length > 80 ? firstLine.slice(0, 77) + '\u2026' : firstLine || 'Post';
-    var handle = (data && data.handle) ? data.handle : '?';
-    var displayName = (data && data.displayName) ? data.displayName : handle;
-    var postUrl = (data && data.postUri) ? data.postUri : '#';
-    var body = '<div class="forum-thread-detail-header">' +
-      '<div class="forum-thread-detail-main">' +
-        '<h2>' + escapeHtml(title) + '</h2>' +
-        '<p class="meta">' + escapeHtml(displayName) + ' \u00b7 @' + escapeHtml(handle) + '</p>' +
-        '<p class="sync-status sync-synced">From Bluesky</p>' +
-        '<div class="forum-op-label">Post</div>' +
-        '<div class="forum-reply forum-op text forum-body-html">' + simpleMarkdown(text) + '</div>' +
-      '</div></div>';
-    document.getElementById('forum-thread-detail').innerHTML = body;
-    document.getElementById('forum-replies-list').innerHTML = '';
-    document.getElementById('forum-reply-form').dataset.threadId = '';
-    var repliesSection = document.querySelector('#view-forum .forum-replies');
-    if (repliesSection) {
-      repliesSection.classList.remove('hidden');
-      var hint = repliesSection.querySelector('.forum-replies-hint');
-      if (hint) hint.textContent = 'This post is from Bluesky only. To reply here, import the thread first (paste its AT URI in the box below), then open it from Community.';
-    }
-    document.getElementById('forum-thread-standard').classList.add('hidden');
-    var threadViewEl = document.getElementById('forum-thread-view');
-    if (threadViewEl) threadViewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var handle = data.handle || '?';
+    var author = '@' + handle;
+    var now = new Date().toISOString();
+    var newId = forumData.nextId++;
+    var thread = {
+      id: newId,
+      title: title,
+      body: text,
+      description: '',
+      publishedAt: now,
+      updatedAt: now,
+      author: author,
+      replies: [],
+      feedPostUri: data.postUri
+    };
+    forumData.threads.push(thread);
+    setForumData(forumData);
+    renderThreadList();
+    openThread(newId);
+    lastForumTab = 'community';
   }
 
   function openThread(id) {
@@ -1330,7 +1343,7 @@ fetch('config.json')
         return '<span class="forum-tag">' + escapeHtml(tag) + '</span>';
       }).join(' ');
     }
-    var threadStatus = syncingForumId === id ? 'Syncing…' : (thread.atUri ? 'Synced to Bluesky' : 'Local only');
+    var threadStatus = syncingForumId === id ? 'Syncing…' : (thread.atUri ? 'Synced to Bluesky' : (thread.feedPostUri ? 'From Bluesky (local)' : 'Local only'));
     var vote = getThreadVote(id);
     var score = (thread.score !== undefined ? thread.score : 0) + (vote === 1 ? 1 : vote === -1 ? -1 : 0);
     var body = '<div class="forum-thread-detail-header">' +
@@ -1905,29 +1918,33 @@ fetch('config.json')
       ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
       : fetchAtRecord(uri);
     return req.then(function (data) {
-      if (typeof BlendskyLexicon === 'undefined' || !BlendskyLexicon.recordToWikiPage) throw new Error('BlendskyLexicon not loaded');
+      if (!data || !(data.value || data.record)) throw new Error('Record not found');
       var record = data.value || data.record || data;
-      var author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
-      var imported = BlendskyLexicon.recordToWikiPage(record, uri, author);
-      if (!imported) throw new Error('Could not parse document');
-      var slug = imported.slug || slugify(imported.title || 'untitled');
-      var pages = getWikiPages();
-      if (pages[slug] && pages[slug].atUri !== uri) {
-        var rkey = (uri.split('/').pop() || '').slice(-6);
-        slug = slug + '-imported-' + (rkey || Date.now().toString(36));
-      }
-      pages[slug] = {
-        title: imported.title || 'Untitled',
-        body: imported.body || '',
-        atUri: uri,
-        createdBy: imported.createdBy || author || 'AT Protocol',
-        version: 0.1,
-        replies: [],
-        suggestedEdits: []
-      };
-      setWikiPages(pages);
-      renderWikiList();
-      openWikiPage(slug);
+      var repo = (data.repo != null) ? data.repo : (uri.indexOf('at://') === 0 ? uri.split('/')[2] : '');
+      return (repo ? getProfileByDid(repo) : Promise.resolve(null)).then(function (profile) {
+        var author = (profile && profile.handle) ? ('@' + profile.handle) : (data.handle || (repo && repo.indexOf('did:') === 0 ? 'AT' : ''));
+        if (typeof BlendskyLexicon === 'undefined' || !BlendskyLexicon.recordToWikiPage) throw new Error('BlendskyLexicon not loaded');
+        var imported = BlendskyLexicon.recordToWikiPage(record, uri, author);
+        if (!imported) throw new Error('Could not parse document');
+        var slug = imported.slug || slugify(imported.title || 'untitled');
+        var pages = getWikiPages();
+        if (pages[slug] && pages[slug].atUri !== uri) {
+          var rkey = (uri.split('/').pop() || '').slice(-6);
+          slug = slug + '-imported-' + (rkey || Date.now().toString(36));
+        }
+        pages[slug] = {
+          title: imported.title || 'Untitled',
+          body: imported.body || '',
+          atUri: uri,
+          createdBy: imported.createdBy || author || 'AT Protocol',
+          version: 0.1,
+          replies: [],
+          suggestedEdits: []
+        };
+        setWikiPages(pages);
+        renderWikiList();
+        openWikiPage(slug);
+      });
     });
   }
 
@@ -3317,6 +3334,14 @@ fetch('config.json')
     }
   }
 
+  /** Resolve blob ref to image URL (getBlob API). */
+  function blobRefToCdnUrl(repoDid, blobRef) {
+    if (!blobRef || !repoDid) return null;
+    var cid = (blobRef && blobRef.$link) || (blobRef && blobRef.ref && blobRef.ref.$link) || (blobRef && blobRef.cid);
+    if (!cid) return null;
+    return 'https://api.bsky.app/xrpc/com.atproto.sync.getBlob?did=' + encodeURIComponent(repoDid) + '&cid=' + encodeURIComponent(cid);
+  }
+
   /** Parse bsky.app post URL and fetch post to get first image or video URL. Returns { url, type, source } or rejects. */
   function resolveBlueskyPostToMedia(bskyAppUrl) {
     var match = bskyAppUrl.match(/^https:\/\/(?:www\.)?bsky\.app\/profile\/([^/]+)\/post\/([a-zA-Z0-9_-]+)/);
@@ -3329,32 +3354,43 @@ fetch('config.json')
         var did = body && body.did;
         if (!did) throw new Error('Could not resolve handle');
         var atUri = 'at://' + did + '/app.bsky.feed.post/' + rkey;
-        return fetch('https://api.bsky.app/xrpc/app.bsky.feed.getPost?uri=' + encodeURIComponent(atUri));
+        return fetch('https://api.bsky.app/xrpc/app.bsky.feed.getPost?uri=' + encodeURIComponent(atUri)).then(function (r) { return r.json().then(function (data) { return { did: did, data: data }; }); });
       })
-      .then(function (r) { return r.json(); })
-      .then(function (body) {
-        var post = body && body.post;
-        if (!post || !post.embed) throw new Error('Post has no image or video');
-        var embed = post.embed;
-        if (embed.images && embed.images.length > 0) {
-          var img = embed.images[0];
-          var mediaUrl = img.fullsize || img.thumb;
-          if (mediaUrl) return { url: mediaUrl, type: 'image', source: bskyAppUrl };
+      .then(function (result) {
+        var body = result.data;
+        var post = (body && body.post) || (body && body.thread && body.thread.post);
+        if (!post) throw new Error('Post not found');
+        var embeds = [];
+        if (post.embed) embeds.push(post.embed);
+        if (post.embeds && Array.isArray(post.embeds)) embeds.push.apply(embeds, post.embeds);
+        var repoDid = result.did;
+        function imageFromView(img) {
+          if (!img) return null;
+          var url = img.fullsize || img.thumb;
+          if (url) return url;
+          return blobRefToCdnUrl(repoDid, img.image || img);
         }
-        if (embed.$type === 'app.bsky.embed.recordWithMedia#view' && embed.media) {
-          var media = embed.media;
-          if (media.images && media.images.length > 0) {
-            var mimg = media.images[0];
-            var murl = mimg.fullsize || mimg.thumb;
-            if (murl) return { url: murl, type: 'image', source: bskyAppUrl };
+        for (var i = 0; i < embeds.length; i++) {
+          var embed = embeds[i];
+          if (!embed) continue;
+          if (embed.images && embed.images.length > 0) {
+            var mediaUrl = imageFromView(embed.images[0]);
+            if (mediaUrl) return { url: mediaUrl, type: 'image', source: bskyAppUrl };
           }
-          if (media.playbackUrl) return { url: media.playbackUrl, type: 'video', source: bskyAppUrl };
-          if (media.content && media.content.playbackUrl) return { url: media.content.playbackUrl, type: 'video', source: bskyAppUrl };
-        }
-        if (embed.playbackUrl) return { url: embed.playbackUrl, type: 'video', source: bskyAppUrl };
-        if (embed.external && (embed.external.thumb || embed.external.uri)) {
-          var extUrl = embed.external.thumb || embed.external.uri;
-          if (extUrl) return { url: extUrl, type: 'image', source: bskyAppUrl };
+          if (embed.$type === 'app.bsky.embed.recordWithMedia#view' && embed.media) {
+            var media = embed.media;
+            if (media.images && media.images.length > 0) {
+              var murl = imageFromView(media.images[0]);
+              if (murl) return { url: murl, type: 'image', source: bskyAppUrl };
+            }
+            if (media.playbackUrl) return { url: media.playbackUrl, type: 'video', source: bskyAppUrl };
+            if (media.content && media.content.playbackUrl) return { url: media.content.playbackUrl, type: 'video', source: bskyAppUrl };
+          }
+          if (embed.playbackUrl) return { url: embed.playbackUrl, type: 'video', source: bskyAppUrl };
+          if (embed.external && (embed.external.thumb || embed.external.uri)) {
+            var extUrl = embed.external.thumb || embed.external.uri;
+            if (extUrl) return { url: extUrl, type: 'image', source: bskyAppUrl };
+          }
         }
         throw new Error('Post has no image or video we can use');
       });
