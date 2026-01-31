@@ -72,9 +72,72 @@ fetch('config.json')
       });
   }
 
+  function bskyProfileUrl(author) {
+    if (!author) return 'https://bsky.app';
+    var did = author.did || '';
+    var handle = author.handle || '';
+    return 'https://bsky.app/profile/' + encodeURIComponent(handle || did || '');
+  }
+
   function loadHomeRecent() {
     var wrap = document.getElementById('home-recent-feed');
+    var descEl = document.getElementById('home-recent-desc');
     if (!wrap) return;
+    var session = getStoredSession();
+
+    if (session && session.did) {
+      if (descEl) descEl.textContent = 'Recent wiki and forum posts from the community. Author DID and Bluesky profile linked.';
+      wrap.innerHTML = '<p class="muted">Loading…</p>';
+      var forumUrl = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#blendsky-forum') + '&limit=10&sort=latest';
+      var wikiUrl = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#blendsky-wiki') + '&limit=10&sort=latest';
+      Promise.all([fetch(forumUrl).then(function (r) { return r.ok ? r.json() : { posts: [] }; }), fetch(wikiUrl).then(function (r) { return r.ok ? r.json() : { posts: [] }; })])
+        .then(function (results) {
+          var forumPosts = (results[0] && results[0].posts) || (results[0] && results[0].feed) || [];
+          var wikiPosts = (results[1] && results[1].posts) || (results[1] && results[1].feed) || [];
+          forumPosts.forEach(function (p) { p._type = 'forum'; });
+          wikiPosts.forEach(function (p) { p._type = 'wiki'; });
+          var merged = forumPosts.concat(wikiPosts);
+          merged.sort(function (a, b) {
+            var ta = (a.record && a.record.createdAt) ? new Date(a.record.createdAt).getTime() : 0;
+            var tb = (b.record && b.record.createdAt) ? new Date(b.record.createdAt).getTime() : 0;
+            return tb - ta;
+          });
+          var slice = merged.slice(0, 14);
+          if (slice.length === 0) {
+            wrap.innerHTML = '<p class="muted">No wiki or forum posts from others yet. Sync your own from Wiki or Forum to join in.</p>';
+            return;
+          }
+          wrap.innerHTML = slice.map(function (p) {
+            var author = p.author || {};
+            var handle = author.handle || author.did || '?';
+            var did = author.did || '';
+            var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 140) : '';
+            if (text.length === 140) text += '…';
+            var postUrl = feedPostUriToBskyUrl(p.uri) || ('https://bsky.app/profile/' + encodeURIComponent(did) + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
+            var profileUrl = bskyProfileUrl(author);
+            var typeLabel = p._type === 'wiki' ? 'Wiki' : 'Forum';
+            return (
+              '<div class="home-recent-network-card">' +
+                '<span class="home-recent-type">' + escapeHtml(typeLabel) + '</span>' +
+                '<p class="home-recent-network-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
+                '<p class="home-recent-network-author">' +
+                  'By <a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="home-recent-profile-link">@' + escapeHtml(handle) + '</a>' +
+                  (did ? ' <span class="home-recent-did" title="' + escapeHtml(did) + '">DID: ' + escapeHtml(did.length > 28 ? did.slice(0, 20) + '…' : did) + '</span>' : '') +
+                '</p>' +
+                '<p class="home-recent-network-actions">' +
+                  '<a href="' + escapeHtml(postUrl) + '" target="_blank" rel="noopener" class="home-recent-post-link">View post</a>' +
+                '</p>' +
+              '</div>'
+            );
+          }).join('');
+        })
+        .catch(function () {
+          wrap.innerHTML = '<p class="muted">Could not load community posts. <a href="https://bsky.app/search?q=%23blendsky-forum" target="_blank" rel="noopener">Search #blendsky-forum</a> or <a href="https://bsky.app/search?q=%23blendsky-wiki" target="_blank" rel="noopener">#blendsky-wiki</a> on Bluesky.</p>';
+        });
+      return;
+    }
+
+    if (descEl) descEl.textContent = 'Your latest wiki pages and forum threads.';
     var wikiPages = getWikiPages();
     var forumData = getForumData();
     var wikiKeys = Object.keys(wikiPages).sort().slice(-5).reverse();
@@ -273,6 +336,7 @@ fetch('config.json')
 
   function initWiki() {
     renderWikiList();
+    loadWikiFromOthers();
     const pages = getWikiPages();
     const firstSlug = Object.keys(pages)[0];
     if (firstSlug) openWikiPage(firstSlug);
@@ -284,6 +348,50 @@ fetch('config.json')
       document.getElementById('wiki-view').classList.remove('hidden');
       document.getElementById('wiki-edit').classList.add('hidden');
     }
+  }
+
+  function loadWikiFromOthers() {
+    var wrap = document.getElementById('wiki-from-others-feed');
+    var loading = document.getElementById('wiki-from-others-loading');
+    if (!wrap || !loading) return;
+    var url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#blendsky-wiki') + '&limit=10&sort=latest';
+    fetch(url)
+      .then(function (r) {
+        if (!r.ok) return r.json().then(function (err) { throw new Error(err.message || r.statusText); });
+        return r.json();
+      })
+      .then(function (data) {
+        var posts = (data && data.posts) || (data && data.feed) || [];
+        loading.classList.add('hidden');
+        if (posts.length === 0) {
+          wrap.innerHTML = '<p class="muted">No #blendsky-wiki posts yet. Sync a wiki page to Bluesky to add the tag.</p>';
+          return;
+        }
+        wrap.innerHTML = posts.map(function (p) {
+          var author = p.author || {};
+          var handle = author.handle || author.did || '?';
+          var did = author.did || '';
+          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 140) : '';
+          if (text.length === 140) text += '…';
+          var postUrl = feedPostUriToBskyUrl(p.uri) || ('https://bsky.app/profile/' + encodeURIComponent(did) + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
+          var profileUrl = bskyProfileUrl(author);
+          return (
+            '<div class="wiki-from-others-card">' +
+              '<a href="' + escapeHtml(postUrl) + '" target="_blank" rel="noopener" class="wiki-from-others-card-link">' +
+                '<p class="wiki-from-others-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
+              '</a>' +
+              '<p class="wiki-from-others-author">' +
+                'By <a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener">@' + escapeHtml(handle) + '</a>' +
+                (did ? ' <span class="wiki-from-others-did" title="' + escapeHtml(did) + '">DID: ' + escapeHtml(did.length > 28 ? did.slice(0, 20) + '…' : did) + '</span>' : '') +
+              '</p>' +
+            '</div>'
+          );
+        }).join('');
+      })
+      .catch(function () {
+        loading.classList.add('hidden');
+        wrap.innerHTML = '<p class="muted">See <a href="https://bsky.app/search?q=%23blendsky-wiki" target="_blank" rel="noopener">#blendsky-wiki on Bluesky</a> for wiki articles from others.</p>';
+      });
   }
 
   document.getElementById('wiki-new').addEventListener('click', function () {
@@ -831,15 +939,23 @@ fetch('config.json')
         wrap.innerHTML = posts.map(function (p) {
           var author = p.author || {};
           var handle = author.handle || author.did || '?';
+          var did = author.did || '';
           var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 120) : '';
           if (text.length === 120) text += '…';
           var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : null;
           if (!postUri) postUri = 'https://bsky.app/profile/' + (author.did || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : '');
+          var profileUrl = bskyProfileUrl(author);
           return (
-            '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="forum-discover-card">' +
-              '<span class="discover-handle">@' + escapeHtml(handle) + '</span>' +
-              '<p class="discover-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
-            '</a>'
+            '<div class="forum-discover-card-wrap">' +
+              '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="forum-discover-card">' +
+                '<span class="discover-handle">@' + escapeHtml(handle) + '</span>' +
+                '<p class="discover-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
+              '</a>' +
+              '<p class="forum-discover-author-meta">' +
+                (did ? '<span class="forum-discover-did" title="' + escapeHtml(did) + '">DID: ' + escapeHtml(did.length > 32 ? did.slice(0, 24) + '…' : did) + '</span> ' : '') +
+                '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a>' +
+              '</p>' +
+            '</div>'
           );
         }).join('');
       })
@@ -1062,7 +1178,7 @@ fetch('config.json')
       .then(function (res) {
         page.atUri = res.uri;
         page.updatedAt = new Date().toISOString();
-        return postContentAsFeed(page.title, page.body);
+        return postContentAsFeed(page.title, (page.body || '') + '\n\n#blendsky-wiki');
       })
       .then(function () {
         pages[slug] = page;
