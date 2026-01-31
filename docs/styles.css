@@ -1919,6 +1919,7 @@ body {
   background: var(--f-bg);
 }
 
+/* Toolbar: underline tabs + solid CTA */
 #view-forum .forum-toolbar-piefed {
   margin-bottom: 0;
   padding-bottom: 0.75rem;
@@ -1965,6 +1966,7 @@ body {
   filter: brightness(0.9);
 }
 
+/* Discover pane: clean list, no heavy cards */
 #view-forum #forum-discover {
   background: transparent;
   border: none;
@@ -2070,6 +2072,7 @@ body {
   padding: 0.25rem 0.5rem;
 }
 
+/* My threads: same list style */
 #view-forum .forum-thread-list {
   gap: 0;
   background: var(--f-surface);
@@ -2120,6 +2123,7 @@ body {
   color: var(--f-muted);
 }
 
+/* Thread view: clean article + replies */
 #view-forum #forum-thread-view {
   padding-top: 0.5rem;
 }
@@ -2213,6 +2217,7 @@ body {
   font-size: 0.95rem;
 }
 
+/* New / Edit views: minimal form */
 #view-forum #forum-new-view,
 #view-forum #forum-edit-view {
   padding: 1rem 0;
@@ -2262,6 +2267,7 @@ body {
   color: var(--f-surface);
 }
 
+/* Import/export: subtle footer */
 #view-forum .forum-import-export {
   margin-top: 1.5rem;
   padding: 1rem 0;
@@ -2278,6 +2284,7 @@ body {
   border-radius: var(--f-radius);
 }
 
+/* Desktop: single column, no grid for discover */
 @media (min-width: 900px) {
   body.view-forum .main {
     max-width: 720px;
