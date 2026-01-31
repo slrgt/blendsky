@@ -8,6 +8,17 @@
   'use strict';
 
   const NS_DOCUMENT = 'site.standard.document';
+  /** Vote record: app.blendsky.vote. subject = AT URI (or uri#reply-N). value = 1 (up) or -1 (down). Published to user repo so indexers can aggregate. */
+  const NS_VOTE = 'app.blendsky.vote';
+  function voteRkeyForSubject(subject) {
+    if (!subject || typeof subject !== 'string') return 'vote-0';
+    var h = 0;
+    for (var i = 0; i < subject.length; i++) h = ((h << 5) - h) + subject.charCodeAt(i) | 0;
+    return 'v-' + Math.abs(h).toString(36) + '-' + subject.length;
+  }
+  function makeVoteRecord(subject, value, createdAt) {
+    return { subject: subject, value: value === 1 ? 1 : -1, createdAt: createdAt || new Date().toISOString() };
+  }
 
   /** site.standard.document record for a wiki page. path: /wiki/slug. site: app origin so Constellation can index by target. */
   function documentFromWikiPage(page, slug, baseUrl) {
@@ -104,6 +115,9 @@
 
   global.BlendskyLexicon = {
     NS_DOCUMENT: NS_DOCUMENT,
+    NS_VOTE: NS_VOTE,
+    voteRkeyForSubject: voteRkeyForSubject,
+    makeVoteRecord: makeVoteRecord,
     documentFromWikiPage: documentFromWikiPage,
     documentFromThread: documentFromThread,
     threadToDocumentShape: threadToDocumentShape,

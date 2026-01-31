@@ -680,6 +680,41 @@ fetch('config.json')
         }).catch(function () { return null; });
       })).then(function (arr) { return arr.filter(Boolean); });
     }).catch(function () { return []; });
+    var wikiListRecordsPromise = searchPostsBluesky('#blendsky-wiki', 50).then(function (data) {
+      var posts = (data && data.posts) || (data && data.feed) || (data && data.result && data.result.posts) || (Array.isArray(data) ? data : []);
+      if (!Array.isArray(posts)) posts = [];
+      var dids = [];
+      var seen = {};
+      posts.forEach(function (p) {
+        var did = (p.author && p.author.did) || (p.author && p.author.handle);
+        if (did && !seen[did]) { seen[did] = true; dids.push(did); }
+      });
+      return Promise.all(dids.slice(0, 20).map(function (did) {
+        return listRecordsForRepo(did, 'site.standard.document', 100).then(function (records) {
+          return records.map(function (rec) {
+            var record = rec.value;
+            var path = (record && record.path) ? String(record.path) : '';
+            if (path.indexOf('/wiki/') !== 0) return null;
+            var title = (record && record.title) || 'Untitled';
+            var content = (record && (record.content || record.textContent)) || '';
+            var snippet = String(content).replace(/\n/g, ' ').slice(0, 140);
+            if (snippet.length === 140) snippet += '…';
+            var sortAt = new Date(record.publishedAt || record.updatedAt || 0).getTime();
+            var didFromUri = (rec.uri && rec.uri.indexOf('at://') === 0) ? rec.uri.split('/')[2] : did;
+            return { _type: 'lexicon', uri: rec.uri, did: didFromUri, title: title, snippet: snippet, sortAt: sortAt };
+          }).filter(Boolean);
+        });
+      })).then(function (arrays) {
+        var all = [];
+        var seenUri = {};
+        arrays.forEach(function (arr) {
+          arr.forEach(function (c) {
+            if (!seenUri[c.uri]) { seenUri[c.uri] = true; all.push(c); }
+          });
+        });
+        return all;
+      });
+    }).catch(function () { return []; });
     var wikiSearchPromise = searchPostsBluesky('#blendsky-wiki', 50).then(function (data) {
       var posts = (data && data.posts) || (data && data.feed) || (data && data.result && data.result.posts) || (Array.isArray(data) ? data : []);
       if (!Array.isArray(posts)) posts = [];
@@ -695,32 +730,46 @@ fetch('config.json')
         return { _type: 'feed', did: author.did, handle: author.handle || author.did || '?', title: title || 'Wiki post', snippet: snippet, sortAt: sortAt, postUrl: postUrl };
       });
     }).catch(function () { return []; });
-    Promise.all([constellationPromise, wikiSearchPromise]).then(function (results) {
-      var lexiconCards = results[0];
-      var feedCards = results[1];
+    Promise.all([constellationPromise, wikiListRecordsPromise, wikiSearchPromise]).then(function (results) {
+      var constellationLexicon = results[0];
+      var listRecordsLexicon = results[1];
+      var feedCards = results[2];
+      var seenUri = {};
+      var lexiconCards = [];
+      constellationLexicon.forEach(function (c) { if (!seenUri[c.uri]) { seenUri[c.uri] = true; lexiconCards.push(c); } });
+      listRecordsLexicon.forEach(function (c) { if (!seenUri[c.uri]) { seenUri[c.uri] = true; lexiconCards.push(c); } });
       var items = [];
       lexiconCards.forEach(function (c) { items.push({ sortAt: c.sortAt, _type: 'lexicon', c: c }); });
       feedCards.forEach(function (c) { items.push({ sortAt: c.sortAt, _type: 'feed', c: c }); });
       items.sort(function (a, b) { return (b.sortAt || 0) - (a.sortAt || 0); });
       loading.classList.add('hidden');
       if (items.length === 0) {
-        wrap.innerHTML = '<p class="muted">No wiki articles from others yet. Sync a page to Bluesky (uses Standard.site <code>site.standard.document</code>).</p>';
+        wrap.innerHTML = '<p class="muted">No wiki articles from others yet. Sync a page to Bluesky (uses Standard.site <code>site.standard.document</code>). Others who sync with #blendsky-wiki will appear here.</p>';
         return;
       }
-      var profilePromises = items.filter(function (i) { return i._type === 'lexicon'; }).map(function (i) { return getProfileByDid(i.c.did).then(function (p) { i.c.profile = p; return i; }); });
+      var profilePromises = items.map(function (i) {
+        var did = i.c.did;
+        return getProfileByDid(did).then(function (p) { i.c.profile = p || {}; return i; });
+      });
       Promise.all(profilePromises).then(function () {
         wrap.innerHTML = items.map(function (item) {
           if (item._type === 'lexicon') {
             var c = item.c;
             var profile = c.profile || {};
             var handle = profile.handle || c.did || '?';
+            var displayName = profile.displayName || handle;
+            var avatarUrl = profile.avatar || '';
             var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
+            var avatarHtml = avatarUrl
+              ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="wiki-from-others-avatar" loading="lazy" />'
+              : '<span class="wiki-from-others-avatar wiki-from-others-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
             return (
               '<div class="wiki-from-others-card" data-wiki-uri="' + escapeHtml(c.uri) + '">' +
+                '<div class="wiki-from-others-byline">' + avatarHtml +
                 '<a href="#" class="wiki-from-others-card-link wiki-from-others-card-lexicon" title="Open in Wiki to view and reply">' +
                   '<strong class="wiki-from-others-title">' + escapeHtml(c.title) + '</strong>' +
                   '<p class="wiki-from-others-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
-                '</a>' +
+                '</a></div>' +
                 '<p class="wiki-from-others-author">' +
                   'By <a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener">@' + escapeHtml(handle) + '</a>' +
                   (c.did ? ' <span class="wiki-from-others-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span>' : '') +
@@ -733,15 +782,23 @@ fetch('config.json')
             );
           }
           var c = item.c;
-          var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(c.handle || c.did || '');
+          var profile = c.profile || {};
+          var handle = profile.handle || c.handle || c.did || '?';
+          var displayName = profile.displayName || handle;
+          var avatarUrl = profile.avatar || '';
+          var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did || '');
+          var avatarHtml = avatarUrl
+            ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="wiki-from-others-avatar" loading="lazy" />'
+            : '<span class="wiki-from-others-avatar wiki-from-others-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
           return (
             '<div class="wiki-from-others-card">' +
+              '<div class="wiki-from-others-byline">' + avatarHtml +
               '<a href="' + escapeHtml(c.postUrl) + '" target="_blank" rel="noopener" class="wiki-from-others-card-link">' +
                 '<strong class="wiki-from-others-title">' + escapeHtml(c.title) + '</strong>' +
                 '<p class="wiki-from-others-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
-              '</a>' +
+              '</a></div>' +
               '<p class="wiki-from-others-author">' +
-                'By <a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener">@' + escapeHtml(c.handle) + '</a>' +
+                'By <a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener">@' + escapeHtml(handle) + '</a>' +
                 (c.did ? ' <span class="wiki-from-others-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span>' : '') +
               '</p>' +
             '</div>'
@@ -779,7 +836,7 @@ fetch('config.json')
       });
     }).catch(function () {
       loading.classList.add('hidden');
-      wrap.innerHTML = '<p class="muted">Could not load wiki articles. Sync a page to Bluesky (Standard.site <code>site.standard.document</code>).</p>';
+      wrap.innerHTML = '<p class="muted">Could not load wiki articles. Sync a page to Bluesky (Standard.site <code>site.standard.document</code>) and tag with #blendsky-wiki so others can discover it.</p>';
     });
   }
 
@@ -1085,6 +1142,12 @@ fetch('config.json')
     var votes = getForumVotes();
     votes['t' + threadId] = value;
     setForumVotes(votes);
+    var data = getForumData();
+    var thread = data.threads && data.threads.find(function (t) { return t.id === threadId; });
+    if (thread && thread.atUri) {
+      putVoteRecord(thread.atUri, value);
+      reportVoteToServer(thread.atUri, value);
+    }
   }
   function getDiscoverVote(uri) {
     var votes = getForumVotes();
@@ -1095,6 +1158,10 @@ fetch('config.json')
     var votes = getForumVotes();
     votes['u' + uri] = value;
     setForumVotes(votes);
+    if (uri) {
+      putVoteRecord(uri, value);
+      reportVoteToServer(uri, value);
+    }
   }
   function getReplyVote(threadId, replyIndex) {
     var votes = getForumVotes();
@@ -1105,6 +1172,13 @@ fetch('config.json')
     var votes = getForumVotes();
     votes['r' + threadId + '_' + replyIndex] = value;
     setForumVotes(votes);
+    var data = getForumData();
+    var thread = data.threads && data.threads.find(function (t) { return t.id === threadId; });
+    if (thread && thread.atUri) {
+      var subject = thread.atUri + '#reply-' + replyIndex;
+      putVoteRecord(subject, value);
+      reportVoteToServer(subject, value);
+    }
   }
 
   function renderThreadList() {
@@ -1126,12 +1200,13 @@ fetch('config.json')
               var vote = getThreadVote(t.id);
               var score = (t.score !== undefined ? t.score : 0) + (vote === 1 ? 1 : vote === -1 ? -1 : 0);
               var status = syncingForumId === t.id ? 'syncing' : (t.atUri ? 'synced' : 'local');
+              var atUri = t.atUri || '';
               var replyCount = t.replies ? t.replies.length : 0;
               var dateStr = t.publishedAt ? new Date(t.publishedAt).toLocaleDateString(undefined, { dateStyle: 'short' }) : '';
               var byline = 'by ' + escapeHtml(t.author || 'Anonymous') + (dateStr ? ' · ' + dateStr : '');
               var badge = '<span class="forum-card-badge sync-badge sync-' + status + '">' + (status === 'syncing' ? '…' : status === 'synced' ? '✓' : '') + '</span>';
               return (
-                '<div class="forum-card-wrap forum-thread-row" data-thread-id="' + t.id + '">' +
+                '<div class="forum-card-wrap forum-thread-row" data-thread-id="' + t.id + '" data-at-uri="' + escapeHtml(atUri) + '">' +
                   '<div class="forum-card-vote">' +
                     '<button type="button" class="forum-vote-btn forum-vote-up" aria-label="Upvote">▲</button>' +
                     '<span class="forum-vote-score">' + score + '</span>' +
@@ -1174,6 +1249,18 @@ fetch('config.json')
       if (upBtn) upBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); updateVote(); });
       if (downBtn) downBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); updateDown(); });
     });
+    if (API && data.threads.length > 0) {
+      var atUris = data.threads.map(function (t) { return t.atUri; }).filter(Boolean);
+      if (atUris.length > 0) {
+        fetchVoteCounts(atUris).then(function (counts) {
+          list.querySelectorAll('.forum-thread-row').forEach(function (row) {
+            var uri = row.getAttribute('data-at-uri');
+            var scoreEl = row.querySelector('.forum-vote-score');
+            if (uri && counts[uri] && scoreEl) scoreEl.textContent = (counts[uri].up || 0) - (counts[uri].down || 0);
+          });
+        });
+      }
+    }
   }
 
   function openForumGuestPost(data) {
@@ -1307,8 +1394,16 @@ fetch('config.json')
         var v = getReplyVote(threadId, replyIndex);
         if (scoreEl) scoreEl.textContent = v === 1 ? 1 : v === -1 ? -1 : 0;
       }
-      if (upBtn) upBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setReplyVote(threadId, replyIndex, getReplyVote(threadId, replyIndex) === 1 ? 0 : 1); refreshReplyVote(); });
-      if (downBtn) downBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setReplyVote(threadId, replyIndex, getReplyVote(threadId, replyIndex) === -1 ? 0 : -1); refreshReplyVote(); });
+      function updateReplyScoreFromServer() {
+        var data = getForumData();
+        var th = data.threads && data.threads.find(function (t) { return t.id === threadId; });
+        if (API && th && th.atUri && scoreEl) {
+          var sub = th.atUri + '#reply-' + replyIndex;
+          fetchVoteCounts([sub]).then(function (c) { if (c[sub]) scoreEl.textContent = (c[sub].up || 0) - (c[sub].down || 0); });
+        }
+      }
+      if (upBtn) upBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setReplyVote(threadId, replyIndex, getReplyVote(threadId, replyIndex) === 1 ? 0 : 1); refreshReplyVote(); updateReplyScoreFromServer(); });
+      if (downBtn) downBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setReplyVote(threadId, replyIndex, getReplyVote(threadId, replyIndex) === -1 ? 0 : -1); refreshReplyVote(); updateReplyScoreFromServer(); });
     });
     document.getElementById('forum-reply-form').dataset.threadId = String(id);
     document.getElementById('forum-reply-body').value = '';
@@ -1349,6 +1444,21 @@ fetch('config.json')
     var threadViewEl = document.getElementById('forum-thread-view');
     if (threadViewEl) threadViewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     attachQuoteButtons(id);
+    if (API && thread.atUri) {
+      var replySubjects = (thread.replies || []).map(function (_, i) { return thread.atUri + '#reply-' + i; });
+      var subjects = [thread.atUri].concat(replySubjects);
+      fetchVoteCounts(subjects).then(function (counts) {
+        var mainCol = detail.querySelector('.forum-vote-col-detail');
+        var mainScore = mainCol && mainCol.querySelector('.forum-vote-score');
+        if (mainScore && counts[thread.atUri]) mainScore.textContent = (counts[thread.atUri].up || 0) - (counts[thread.atUri].down || 0);
+        repliesList.querySelectorAll('.forum-reply-item').forEach(function (li) {
+          var idx = parseInt(li.getAttribute('data-reply-index'), 10);
+          var sub = thread.atUri + '#reply-' + idx;
+          var scoreEl = li.querySelector('.forum-vote-score');
+          if (scoreEl && counts[sub]) scoreEl.textContent = (counts[sub].up || 0) - (counts[sub].down || 0);
+        });
+      });
+    }
   }
 
   document.getElementById('forum-new-thread').addEventListener('click', function () {
@@ -1543,14 +1653,16 @@ fetch('config.json')
 
   document.getElementById('forum-reply-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    const id = Number(this.dataset.threadId);
+    const idRaw = this.dataset.threadId;
+    const id = idRaw !== undefined && idRaw !== '' ? Number(idRaw) : NaN;
     const text = document.getElementById('forum-reply-body').value.trim();
     if (!text) return;
     const data = getForumData();
-    const thread = data.threads.find(function (t) {
-      return t.id === id;
-    });
-    if (!thread) return;
+    const thread = (id === id && data.threads) ? data.threads.find(function (t) { return t.id === id; }) : null;
+    if (!thread) {
+      alert('This thread isn\'t in your local forum yet. To reply here: open it from Community (so it\'s imported), or paste its AT URI in the import box below and open it. Bluesky-only posts must be imported as a Standard.site document first.');
+      return;
+    }
     if (!thread.replies) thread.replies = [];
     var session = getStoredSession();
     var replyAuthor = (session && session.handle) ? ('@' + session.handle) : 'You';
@@ -1869,6 +1981,25 @@ fetch('config.json')
     });
   });
 
+  /** List records in a repo by collection (e.g. site.standard.document). Tries App View then PDS. Returns Promise<{ uri, value }[]>. */
+  function listRecordsForRepo(did, collection, limit) {
+    if (!did || !collection) return Promise.resolve([]);
+    var url = PUBLIC_APP_VIEW + '/xrpc/com.atproto.repo.listRecords?repo=' + encodeURIComponent(did) + '&collection=' + encodeURIComponent(collection) + '&limit=' + (limit || 100);
+    return fetch(url)
+      .then(function (r) {
+        if (r.ok) return r.json();
+        return getPdsFromDid(did).then(function (pdsUrl) {
+          var pdsQuery = pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.repo.listRecords?repo=' + encodeURIComponent(did) + '&collection=' + encodeURIComponent(collection) + '&limit=' + (limit || 100);
+          return fetch(pdsQuery).then(function (r2) { return r2.ok ? r2.json() : { records: [] }; });
+        });
+      })
+      .then(function (data) {
+        var records = (data && data.records) || [];
+        return records.map(function (rec) { return { uri: rec.uri, value: rec.value }; });
+      })
+      .catch(function () { return []; });
+  }
+
   /** Fetch DIDs that link to target (e.g. site.standard.document records). Returns Promise<{ uri, did }[]>. */
   /** When target is an HTTP(S) origin, use path .site so Constellation returns records whose .site field equals that origin. */
   function fetchConstellationLinks(targetOrigin, collection, path, limit) {
@@ -2076,9 +2207,28 @@ fetch('config.json')
             var v = getDiscoverVote(uri);
             if (scoreEl) scoreEl.textContent = v === 1 ? 1 : v === -1 ? -1 : 0;
           }
-          if (upBtn) upBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setDiscoverVote(uri, getDiscoverVote(uri) === 1 ? 0 : 1); refreshDiscoverVote(); });
-          if (downBtn) downBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setDiscoverVote(uri, getDiscoverVote(uri) === -1 ? 0 : -1); refreshDiscoverVote(); });
+          function updateScoreFromServer() {
+            if (API && scoreEl) fetchVoteCounts([uri]).then(function (c) { if (c[uri]) scoreEl.textContent = (c[uri].up || 0) - (c[uri].down || 0); });
+          }
+          if (upBtn) upBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setDiscoverVote(uri, getDiscoverVote(uri) === 1 ? 0 : 1); refreshDiscoverVote(); updateScoreFromServer(); });
+          if (downBtn) downBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setDiscoverVote(uri, getDiscoverVote(uri) === -1 ? 0 : -1); refreshDiscoverVote(); updateScoreFromServer(); });
         });
+        if (API && parts.length > 0) {
+          var discoverUris = [];
+          wrap.querySelectorAll('.forum-discover-card-wrap[data-discover-uri]').forEach(function (row) {
+            var u = row.getAttribute('data-discover-uri');
+            if (u) discoverUris.push(u);
+          });
+          if (discoverUris.length > 0) {
+            fetchVoteCounts(discoverUris).then(function (counts) {
+              wrap.querySelectorAll('.forum-discover-card-wrap[data-discover-uri]').forEach(function (row) {
+                var u = row.getAttribute('data-discover-uri');
+                var el = row.querySelector('.forum-vote-score');
+                if (u && counts[u] && el) el.textContent = (counts[u].up || 0) - (counts[u].down || 0);
+              });
+            });
+          }
+        }
         wrap.querySelectorAll('.forum-discover-card-lexicon').forEach(function (a) {
           var wrapEl = a.closest('.forum-discover-card-wrap');
           var uri = wrapEl && wrapEl.getAttribute('data-lexicon-uri');
@@ -2285,6 +2435,71 @@ fetch('config.json')
         throw err;
       });
     });
+  }
+
+  /** Delete a record from the logged-in user's Bluesky repo. Refreshes session on 401/ExpiredToken and retries once. */
+  function deleteRecordToBluesky(collection, rkey) {
+    var session = getStoredSession();
+    if (!session || !session.accessJwt || !session.pdsUrl) return Promise.reject(new Error('Not connected to Bluesky'));
+    function doDelete(s) {
+      var url = s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.repo.deleteRecord';
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.accessJwt },
+        body: JSON.stringify({ repo: s.did, collection: collection, rkey: rkey })
+      }).then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (err) {
+            var msg = (err && (err.message || err.error)) || res.statusText;
+            var e = new Error(msg);
+            if (res.status === 401 || (err && (err && err.error === 'ExpiredToken'))) e._expired = true;
+            throw e;
+          }).catch(function (parseErr) {
+            if (parseErr._expired) throw parseErr;
+            throw new Error(res.status + ' ' + res.statusText);
+          });
+        }
+        return res.json();
+      });
+    }
+    return ensureSessionDid(session).then(function (s) {
+      return doDelete(s).catch(function (err) {
+        if (err && (err.message && (err.message.indexOf('ExpiredToken') !== -1 || err.message.indexOf('expired') !== -1))) {
+          return refreshSession().then(function (newS) { return doDelete(newS); });
+        }
+        throw err;
+      });
+    });
+  }
+
+  /** Publish vote to ATProto (app.blendsky.vote) and report to server for aggregation. subject = AT URI or post URI; value = 1, -1, or 0 (remove). */
+  function putVoteRecord(subjectUri, value) {
+    if (!subjectUri || typeof BlendskyLexicon === 'undefined' || !BlendskyLexicon.NS_VOTE) return Promise.resolve();
+    var session = getStoredSession();
+    if (!session || !session.accessJwt) return Promise.resolve();
+    var rkey = BlendskyLexicon.voteRkeyForSubject(subjectUri);
+    if (value === 0) {
+      return deleteRecordToBluesky(BlendskyLexicon.NS_VOTE, rkey).catch(function () {});
+    }
+    var record = BlendskyLexicon.makeVoteRecord(subjectUri, value, new Date().toISOString());
+    return putRecordToBluesky(BlendskyLexicon.NS_VOTE, rkey, record).catch(function () {});
+  }
+  function reportVoteToServer(subjectUri, value) {
+    if (!API || !subjectUri) return;
+    fetch(API + '/api/votes', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: subjectUri, value: value })
+    }).catch(function () {});
+  }
+  function fetchVoteCounts(subjects) {
+    if (!API || !subjects || subjects.length === 0) return Promise.resolve({});
+    var q = subjects.filter(Boolean).join(',');
+    if (!q) return Promise.resolve({});
+    return fetch(API + '/api/votes?subjects=' + encodeURIComponent(q), { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .catch(function () { return {}; });
   }
 
   /** Upload an image blob to the user's repo. Returns a URL that can be embedded in content (getBlob). Refreshes session on 401/ExpiredToken and retries once. */
@@ -3102,6 +3317,49 @@ fetch('config.json')
     }
   }
 
+  /** Parse bsky.app post URL and fetch post to get first image or video URL. Returns { url, type, source } or rejects. */
+  function resolveBlueskyPostToMedia(bskyAppUrl) {
+    var match = bskyAppUrl.match(/^https:\/\/(?:www\.)?bsky\.app\/profile\/([^/]+)\/post\/([a-zA-Z0-9_-]+)/);
+    if (!match) return Promise.reject(new Error('Not a Bluesky post URL. Use https://bsky.app/profile/HANDLE/post/POST_ID'));
+    var handle = match[1];
+    var rkey = match[2];
+    return fetch('https://api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=' + encodeURIComponent(handle))
+      .then(function (r) { return r.json(); })
+      .then(function (body) {
+        var did = body && body.did;
+        if (!did) throw new Error('Could not resolve handle');
+        var atUri = 'at://' + did + '/app.bsky.feed.post/' + rkey;
+        return fetch('https://api.bsky.app/xrpc/app.bsky.feed.getPost?uri=' + encodeURIComponent(atUri));
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (body) {
+        var post = body && body.post;
+        if (!post || !post.embed) throw new Error('Post has no image or video');
+        var embed = post.embed;
+        if (embed.images && embed.images.length > 0) {
+          var img = embed.images[0];
+          var mediaUrl = img.fullsize || img.thumb;
+          if (mediaUrl) return { url: mediaUrl, type: 'image', source: bskyAppUrl };
+        }
+        if (embed.$type === 'app.bsky.embed.recordWithMedia#view' && embed.media) {
+          var media = embed.media;
+          if (media.images && media.images.length > 0) {
+            var mimg = media.images[0];
+            var murl = mimg.fullsize || mimg.thumb;
+            if (murl) return { url: murl, type: 'image', source: bskyAppUrl };
+          }
+          if (media.playbackUrl) return { url: media.playbackUrl, type: 'video', source: bskyAppUrl };
+          if (media.content && media.content.playbackUrl) return { url: media.content.playbackUrl, type: 'video', source: bskyAppUrl };
+        }
+        if (embed.playbackUrl) return { url: embed.playbackUrl, type: 'video', source: bskyAppUrl };
+        if (embed.external && (embed.external.thumb || embed.external.uri)) {
+          var extUrl = embed.external.thumb || embed.external.uri;
+          if (extUrl) return { url: extUrl, type: 'image', source: bskyAppUrl };
+        }
+        throw new Error('Post has no image or video we can use');
+      });
+  }
+
   function saveFromCollectionsMediaModal() {
     var urlInput = document.getElementById('collections-media-url');
     var sourceInput = document.getElementById('collections-media-source');
@@ -3111,9 +3369,28 @@ fetch('config.json')
     var albumIds = Array.prototype.map.call(checked || [], function (c) { return c.value; });
 
     if (!url || url.indexOf('http') !== 0) {
-      alert('Paste an image URL from the AT Protocol (e.g. Bluesky CDN) or any public image link. The image stays on the host; we only store the link.');
+      alert('Paste an image URL from the AT Protocol (e.g. Bluesky CDN), a Bluesky post link (bsky.app/profile/…/post/…), or any public image link.');
       return;
     }
+
+    var isBlueskyPost = /^https:\/\/(?:www\.)?bsky\.app\/profile\/[^/]+\/post\/[a-zA-Z0-9_-]+/.test(url);
+    if (isBlueskyPost) {
+      var saveBtn = document.getElementById('collections-media-save');
+      if (saveBtn) saveBtn.disabled = true;
+      resolveBlueskyPostToMedia(url).then(function (res) {
+        var item = { type: res.type, imageUrl: res.url, source: source || res.source, albumIds: albumIds };
+        if (saveCollectionsArchiveItem(item)) {
+          closeCollectionsMediaModal();
+          showCollectionPage(currentCollectionFilter);
+        }
+      }).catch(function (err) {
+        alert('Could not get image/video from that Bluesky post: ' + (err.message || 'unknown'));
+      }).then(function () {
+        if (saveBtn) saveBtn.disabled = false;
+      });
+      return;
+    }
+
     var item = { type: 'image', imageUrl: url, source: source, albumIds: albumIds };
     if (saveCollectionsArchiveItem(item)) {
       closeCollectionsMediaModal();

@@ -249,6 +249,77 @@ app.get('/api/at/record', async (req, res, next) => {
   }
 });
 
+// ——— Vote aggregation (app.blendsky.vote records; clients publish to ATProto and report here so we can aggregate) ———
+// subject -> Map(did -> value 1|-1)
+const voteStore = new Map();
+function getVoteCounts(subjects) {
+  if (!Array.isArray(subjects) || subjects.length === 0) return {};
+  const out = {};
+  for (const subject of subjects) {
+    const sub = subject && String(subject).trim();
+    if (!sub) continue;
+    const byDid = voteStore.get(sub);
+    let up = 0, down = 0;
+    if (byDid) {
+      for (const v of byDid.values()) {
+        if (v === 1) up++;
+        else if (v === -1) down++;
+      }
+    }
+    out[sub] = { up, down };
+  }
+  return out;
+}
+function setVote(did, subject, value) {
+  const sub = subject && String(subject).trim();
+  if (!sub) return;
+  let byDid = voteStore.get(sub);
+  if (!byDid) {
+    byDid = new Map();
+    voteStore.set(sub, byDid);
+  }
+  if (value === 0) {
+    byDid.delete(did);
+    if (byDid.size === 0) voteStore.delete(sub);
+  } else {
+    byDid.set(did, value === 1 ? 1 : -1);
+  }
+}
+
+app.post('/api/votes', async (req, res, next) => {
+  try {
+    const did = req.cookies?.blendsky_did;
+    if (!did) {
+      return res.status(401).json({ error: 'Not connected' });
+    }
+    const { subject, value } = req.body || {};
+    const sub = subject && String(subject).trim();
+    if (!sub) {
+      return res.status(400).json({ error: 'Missing subject' });
+    }
+    const val = value === 0 ? 0 : value === 1 || value === '1' ? 1 : value === -1 || value === '-1' ? -1 : null;
+    if (val === null && value !== 0) {
+      return res.status(400).json({ error: 'value must be 1, -1, or 0' });
+    }
+    setVote(did, sub, val === null ? 0 : val);
+    const counts = getVoteCounts([sub]);
+    res.json(counts[sub] || { up: 0, down: 0 });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/api/votes', (req, res, next) => {
+  try {
+    const raw = (req.query.subjects || '').toString().trim();
+    const subjects = raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const counts = getVoteCounts(subjects);
+    res.json(counts);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Disconnect
 app.post('/api/auth/bluesky/disconnect', async (req, res, next) => {
   try {
