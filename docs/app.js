@@ -876,16 +876,6 @@ fetch('config.json')
     document.getElementById('wiki-edit').classList.remove('hidden');
   });
 
-  document.getElementById('wiki-request-edit').addEventListener('click', function () {
-    if (!currentWikiSlug) return;
-    var pages = getWikiPages();
-    var page = pages[currentWikiSlug];
-    if (!page || !page.atUri) return;
-    var text = 'Requesting edit access to "' + (page.title || 'Untitled') + '": ' + page.atUri;
-    var url = 'https://bsky.app/intent/compose?text=' + encodeURIComponent(text);
-    window.open(url, '_blank', 'noopener');
-  });
-
   document.getElementById('wiki-suggest-edit').addEventListener('click', function () {
     if (!currentWikiSlug) return;
     var pages = getWikiPages();
