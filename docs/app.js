@@ -79,6 +79,24 @@ fetch('config.json')
     return 'https://bsky.app/profile/' + encodeURIComponent(handle || did || '');
   }
 
+  /** Search Bluesky posts by query. Uses PDS + auth when logged in (so results load); falls back to public API when not. */
+  function searchPostsBluesky(q, limit) {
+    var session = getStoredSession();
+    var params = 'q=' + encodeURIComponent(q) + '&limit=' + (limit || 10) + '&sort=latest';
+    var url;
+    var opts = { method: 'GET' };
+    if (session && session.accessJwt && session.pdsUrl) {
+      url = session.pdsUrl.replace(/\/$/, '') + '/xrpc/app.bsky.feed.searchPosts?' + params;
+      opts.headers = { Authorization: 'Bearer ' + session.accessJwt };
+    } else {
+      url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?' + params;
+    }
+    return fetch(url, opts).then(function (r) {
+      if (!r.ok) return r.json().then(function (err) { throw new Error(err.message || r.statusText); });
+      return r.json();
+    });
+  }
+
   function loadHomeRecent() {
     var wrap = document.getElementById('home-recent-feed');
     var descEl = document.getElementById('home-recent-desc');
@@ -88,9 +106,10 @@ fetch('config.json')
     if (session && session.did) {
       if (descEl) descEl.textContent = 'Recent wiki and forum posts from the community. Author DID and Bluesky profile linked.';
       wrap.innerHTML = '<p class="muted">Loading…</p>';
-      var forumUrl = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#blendsky-forum') + '&limit=10&sort=latest';
-      var wikiUrl = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#blendsky-wiki') + '&limit=10&sort=latest';
-      Promise.all([fetch(forumUrl).then(function (r) { return r.ok ? r.json() : { posts: [] }; }), fetch(wikiUrl).then(function (r) { return r.ok ? r.json() : { posts: [] }; })])
+      Promise.all([
+        searchPostsBluesky('#blendsky-forum', 10).catch(function () { return { posts: [] }; }),
+        searchPostsBluesky('#blendsky-wiki', 10).catch(function () { return { posts: [] }; })
+      ])
         .then(function (results) {
           var forumPosts = (results[0] && results[0].posts) || (results[0] && results[0].feed) || [];
           var wikiPosts = (results[1] && results[1].posts) || (results[1] && results[1].feed) || [];
@@ -175,12 +194,7 @@ fetch('config.json')
     var wrap = document.getElementById('home-discover-feed');
     var loading = document.getElementById('home-discover-loading');
     if (!wrap || !loading) return;
-    var url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#b3d') + '&limit=8&sort=latest';
-    fetch(url)
-      .then(function (r) {
-        if (!r.ok) return r.json().then(function (err) { throw new Error(err.message || r.statusText); });
-        return r.json();
-      })
+    searchPostsBluesky('#b3d', 8)
       .then(function (data) {
         var posts = (data && data.posts) || (data && data.feed) || [];
         loading.classList.add('hidden');
@@ -193,7 +207,7 @@ fetch('config.json')
           var handle = author.handle || author.did || '?';
           var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 160) : '';
           if (text.length === 160) text += '…';
-          var postUri = p.uri ? 'https://bsky.app/profile/' + (author.did || p.uri.split('/')[2]) + '/post/' + (p.uri.split('/').pop() || '') : '#';
+          var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : ('https://bsky.app/profile/' + (author.did || (p.uri && p.uri.split('/')[2]) || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
           return (
             '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="discover-card">' +
               '<span class="discover-handle">@' + escapeHtml(handle) + '</span>' +
@@ -354,12 +368,7 @@ fetch('config.json')
     var wrap = document.getElementById('wiki-from-others-feed');
     var loading = document.getElementById('wiki-from-others-loading');
     if (!wrap || !loading) return;
-    var url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + encodeURIComponent('#blendsky-wiki') + '&limit=10&sort=latest';
-    fetch(url)
-      .then(function (r) {
-        if (!r.ok) return r.json().then(function (err) { throw new Error(err.message || r.statusText); });
-        return r.json();
-      })
+    searchPostsBluesky('#blendsky-wiki', 10)
       .then(function (data) {
         var posts = (data && data.posts) || (data && data.feed) || [];
         loading.classList.add('hidden');
@@ -922,13 +931,7 @@ fetch('config.json')
     var wrap = document.getElementById('forum-discover-feed');
     var loading = document.getElementById('forum-discover-loading');
     if (!wrap || !loading) return;
-    var q = encodeURIComponent('#blendsky-forum');
-    var url = PUBLIC_APP_VIEW + '/xrpc/app.bsky.feed.searchPosts?q=' + q + '&limit=10&sort=latest';
-    fetch(url)
-      .then(function (r) {
-        if (!r.ok) return r.json().then(function (err) { throw new Error(err.message || r.statusText); });
-        return r.json();
-      })
+    searchPostsBluesky('#blendsky-forum', 10)
       .then(function (data) {
         var posts = (data && data.posts) || (data && data.feed) || [];
         loading.classList.add('hidden');
