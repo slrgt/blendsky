@@ -931,7 +931,7 @@ fetch('config.json')
     var wrap = document.getElementById('forum-discover-feed');
     var loading = document.getElementById('forum-discover-loading');
     if (!wrap || !loading) return;
-    searchPostsBluesky('#blendsky-forum', 10)
+    searchPostsBluesky('#blendsky-forum', 20)
       .then(function (data) {
         var posts = (data && data.posts) || (data && data.feed) || [];
         loading.classList.add('hidden');
@@ -942,16 +942,25 @@ fetch('config.json')
         wrap.innerHTML = posts.map(function (p) {
           var author = p.author || {};
           var handle = author.handle || author.did || '?';
+          var displayName = author.displayName || handle;
           var did = author.did || '';
-          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 120) : '';
-          if (text.length === 120) text += '…';
+          var avatarUrl = author.avatar || '';
+          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 160) : '';
+          if (text.length === 160) text += '…';
           var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : null;
           if (!postUri) postUri = 'https://bsky.app/profile/' + (author.did || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : '');
           var profileUrl = bskyProfileUrl(author);
+          var avatarHtml = avatarUrl
+            ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
+            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || handle).charAt(0).toUpperCase() || '?') + '</span>';
           return (
             '<div class="forum-discover-card-wrap">' +
               '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="forum-discover-card">' +
-                '<span class="discover-handle">@' + escapeHtml(handle) + '</span>' +
+                '<div class="forum-discover-byline">' +
+                  avatarHtml +
+                  '<span class="forum-discover-name">' + escapeHtml(displayName) + '</span>' +
+                  '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+                '</div>' +
                 '<p class="discover-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
               '</a>' +
               '<p class="forum-discover-author-meta">' +
