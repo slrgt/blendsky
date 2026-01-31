@@ -450,9 +450,10 @@ fetch('config.json')
           .map(function (slug) {
             const title = pages[slug].title || slug;
             const page = pages[slug];
+            const author = page.createdBy || page.updatedBy || 'Local';
             const status = syncingWikiSlug === slug ? 'syncing' : (page.atUri ? 'synced' : 'local');
             const badge = '<span class="sync-badge sync-' + status + '" data-wiki-status="' + status + '">' + (status === 'syncing' ? 'Syncing…' : status === 'synced' ? 'Synced' : 'Local') + '</span>';
-            return '<li><a href="#" data-wiki-slug="' + slug + '">' + escapeHtml(title) + '</a> ' + badge + '</li>';
+            return '<li><a href="#" data-wiki-slug="' + slug + '">' + escapeHtml(title) + '</a> <span class="wiki-list-author muted">' + escapeHtml(author) + '</span> ' + badge + '</li>';
           })
           .join('')
       : '<li class="muted">No pages yet. Create one above.</li>';
@@ -629,35 +630,64 @@ fetch('config.json')
     }
   }
 
+  function isWikiPath(path) {
+    if (!path) return false;
+    var p = String(path).replace(/^\//, '');
+    return p.indexOf('wiki/') === 0 || p === 'wiki';
+  }
+
   function loadWikiFromOthers() {
     var wrap = document.getElementById('wiki-from-others-feed');
     var loading = document.getElementById('wiki-from-others-loading');
     if (!wrap || !loading) return;
-    var constellationPromise = fetchConstellationLinks(window.location.origin, 'site.standard.document', '.site', 40).then(function (links) {
-      return Promise.all(links.slice(0, 25).map(function (l) {
+    wrap.innerHTML = '<p class="muted" id="wiki-from-others-loading">Loading…</p>';
+    loading = document.getElementById('wiki-from-others-loading');
+    // Same discovery as forum: Standard.site (Constellation) + Bluesky firehose search. Use .site for this app's records.
+    var constellationPromise = fetchConstellationLinks(window.location.origin, 'site.standard.document', '.site', 50).then(function (links) {
+      return Promise.all(links.slice(0, 30).map(function (l) {
         return fetchAtRecord(l.uri).then(function (data) {
           var record = data.value || data.record;
           var path = (record && record.path) ? String(record.path) : '';
-          if (!record || path.indexOf('/wiki/') !== 0) return null;
+          if (!record || !isWikiPath(path)) return null;
           var title = (record && record.title) || 'Untitled';
           var content = (record && (record.content || record.textContent)) || '';
-          var snippet = String(content).replace(/\n/g, ' ').slice(0, 140);
-          if (snippet.length === 140) snippet += '…';
+          var snippet = String(content).replace(/\n/g, ' ').slice(0, 160);
+          if (snippet.length === 160) snippet += '…';
           var sortAt = new Date(record.publishedAt || record.updatedAt || 0).getTime();
           return { _type: 'lexicon', uri: l.uri, did: l.did, title: title, snippet: snippet, sortAt: sortAt };
         }).catch(function () { return null; });
       })).then(function (arr) { return arr.filter(Boolean); });
     }).catch(function () { return []; });
-    var wikiSearchPromise = searchPostsBluesky('#blendsky-wiki', 25).then(function (data) {
+    function parseWikiSearchPosts(data) {
       var posts = (data && data.posts) || (data && data.feed) || (data && data.result && data.result.posts) || (Array.isArray(data) ? data : []);
-      if (!Array.isArray(posts)) posts = [];
-      return posts.map(function (p) {
+      return Array.isArray(posts) ? posts : [];
+    }
+    var wikiSearchPromise = Promise.all([
+      searchPostsBluesky('#blendsky-wiki', 30).then(parseWikiSearchPosts).catch(function () { return []; }),
+      searchPostsBluesky('blendsky-wiki', 30).then(parseWikiSearchPosts).catch(function () { return []; })
+    ]).then(function (results) {
+      var seen = {};
+      var merged = [];
+      results.forEach(function (posts) {
+        posts.forEach(function (p) {
+          var uri = p && p.uri;
+          if (!uri || seen[uri]) return;
+          seen[uri] = true;
+          merged.push(p);
+        });
+      });
+      merged.sort(function (a, b) {
+        var ta = (a.record && a.record.createdAt) ? new Date(a.record.createdAt).getTime() : 0;
+        var tb = (b.record && b.record.createdAt) ? new Date(b.record.createdAt).getTime() : 0;
+        return tb - ta;
+      });
+      return merged.slice(0, 40).map(function (p) {
         var author = p.author || {};
         var text = (p.record && p.record.text) ? String(p.record.text) : '';
         var firstLine = text.split('\n')[0] || text;
         var title = firstLine.length > 60 ? firstLine.slice(0, 57) + '…' : firstLine;
-        var snippet = text.replace(/\n/g, ' ').slice(0, 140);
-        if (snippet.length === 140) snippet += '…';
+        var snippet = text.replace(/\n/g, ' ').slice(0, 160);
+        if (snippet.length === 160) snippet += '…';
         var sortAt = new Date((p.record && p.record.createdAt) || 0).getTime();
         var postUrl = p.uri ? feedPostUriToBskyUrl(p.uri) : ('https://bsky.app/profile/' + (author.did || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
         return { _type: 'feed', did: author.did, handle: author.handle || author.did || '?', title: title || 'Wiki post', snippet: snippet, sortAt: sortAt, postUrl: postUrl };
@@ -672,7 +702,7 @@ fetch('config.json')
       items.sort(function (a, b) { return (b.sortAt || 0) - (a.sortAt || 0); });
       loading.classList.add('hidden');
       if (items.length === 0) {
-        wrap.innerHTML = '<p class="muted">No wiki articles from others yet. Sync a page to Bluesky (uses Standard.site <code>site.standard.document</code>).</p>';
+        wrap.innerHTML = '<p class="muted">No wiki articles from others yet. Articles come from Standard.site (<code>site.standard.document</code>) and Bluesky (#blendsky-wiki). Sync your pages so others using this app URL can see them; click Refresh to load.</p>';
         return;
       }
       var profilePromises = items.filter(function (i) { return i._type === 'lexicon'; }).map(function (i) { return getProfileByDid(i.c.did).then(function (p) { i.c.profile = p; return i; }); });
@@ -747,7 +777,7 @@ fetch('config.json')
       });
     }).catch(function () {
       loading.classList.add('hidden');
-      wrap.innerHTML = '<p class="muted">Could not load wiki articles. Sync a page to Bluesky (Standard.site <code>site.standard.document</code>).</p>';
+      wrap.innerHTML = '<p class="muted">Could not load wiki articles. They come from Standard.site and Bluesky #blendsky-wiki. Check your connection and click Refresh.</p>';
     });
   }
 
@@ -1792,12 +1822,17 @@ fetch('config.json')
     wrap.innerHTML = '<p class="muted" id="forum-discover-loading">Loading…</p>';
     var loading = document.getElementById('forum-discover-loading');
     // Discovery: site.standard.document (Constellation) + Bluesky search #blendsky-forum. Use .site for this app's records.
+    function isForumPath(path) {
+      if (!path) return false;
+      var p = String(path).replace(/^\//, '');
+      return p.indexOf('forum/') === 0 || p === 'forum';
+    }
     var lexiconPromise = fetchConstellationLinks(window.location.origin, 'site.standard.document', '.site', 50).then(function (links) {
       return Promise.all(links.slice(0, 30).map(function (l) {
         return fetchAtRecord(l.uri).then(function (data) {
           var record = data.value || data.record;
           var path = (record && record.path) ? String(record.path) : '';
-          if (!record || path.indexOf('/forum/') !== 0) return null;
+          if (!record || !isForumPath(path)) return null;
           var title = (record && record.title) || 'Untitled';
           var content = (record && (record.content || record.textContent)) || '';
           var snippet = String(content).replace(/\n/g, ' ').slice(0, 160);

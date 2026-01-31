@@ -647,6 +647,12 @@ body {
   text-decoration: underline;
 }
 
+.wiki-list-author {
+  display: block;
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
 .wiki-main-wikipedia {
   background: var(--bg-card);
   border: 1px solid var(--border);
