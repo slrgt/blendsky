@@ -26,11 +26,28 @@ fetch('config.json')
   var PLC_DIRECTORY = 'https://plc.directory';
   var CONSTELLATION_BASE = 'https://constellation.microcosm.blue';
 
+  /** Standard.site document verification: set or remove <link rel="site.standard.document" href="at://..."> in head so indexers (e.g. standard-search.octet-stream.net) can verify. */
+  function updateDocumentVerificationLink(atUri) {
+    var existing = document.querySelector('link[rel="site.standard.document"]');
+    if (atUri) {
+      if (existing) existing.setAttribute('href', atUri);
+      else {
+        var link = document.createElement('link');
+        link.rel = 'site.standard.document';
+        link.href = atUri;
+        document.head.appendChild(link);
+      }
+    } else {
+      if (existing) existing.remove();
+    }
+  }
+
   // ——— Navigation ———
   const views = document.querySelectorAll('.view');
   const navLinks = document.querySelectorAll('[data-nav]');
 
   function showView(id) {
+    updateDocumentVerificationLink(null);
     const target = id === 'home' ? 'view-home' : 'view-' + id;
     document.body.classList.toggle('view-forum', id === 'forum');
     views.forEach(function (v) {
@@ -450,9 +467,11 @@ fetch('config.json')
           .map(function (slug) {
             const title = pages[slug].title || slug;
             const page = pages[slug];
+            const creator = page.createdBy ? escapeHtml(String(page.createdBy)) : '';
+            const creatorHtml = creator ? ' <span class="wiki-list-creator muted">' + creator + '</span>' : '';
             const status = syncingWikiSlug === slug ? 'syncing' : (page.atUri ? 'synced' : 'local');
             const badge = '<span class="sync-badge sync-' + status + '" data-wiki-status="' + status + '">' + (status === 'syncing' ? 'Syncing…' : status === 'synced' ? 'Synced' : 'Local') + '</span>';
-            return '<li><a href="#" data-wiki-slug="' + slug + '">' + escapeHtml(title) + '</a> ' + badge + '</li>';
+            return '<li><a href="#" data-wiki-slug="' + slug + '">' + escapeHtml(title) + '</a>' + creatorHtml + ' ' + badge + '</li>';
           })
           .join('')
       : '<li class="muted">No pages yet. Create one above.</li>';
@@ -514,6 +533,7 @@ fetch('config.json')
       bodyHtml = '<p class="wiki-remixed-from muted"><small>Remixed from: <a href="' + escapeHtml(page.remixedFrom) + '" target="_blank" rel="noopener">' + escapeHtml(page.remixedFrom) + '</a></small></p>' + bodyHtml;
     }
     document.getElementById('wiki-body').innerHTML = bodyHtml;
+    updateDocumentVerificationLink(page.atUri || null);
     var bylineEl = document.getElementById('wiki-byline');
     if (bylineEl) {
       var createdBy = page.createdBy || 'Local';
@@ -621,6 +641,7 @@ fetch('config.json')
     if (firstSlug) openWikiPage(firstSlug);
     else {
       currentWikiSlug = null;
+      updateDocumentVerificationLink(null);
       updateWikiStatus(null);
       document.getElementById('wiki-title').textContent = '';
       document.getElementById('wiki-body').innerHTML = '<p class="muted">Create a page or pick one from the list.</p>';
@@ -1060,12 +1081,13 @@ fetch('config.json')
     const list = document.getElementById('forum-thread-list');
     const wrap = document.getElementById('forum-thread-view');
     const newWrap = document.getElementById('forum-new-view');
-    list.classList.remove('hidden');
-    wrap.classList.add('hidden');
-    newWrap.classList.add('hidden');
+    if (list) list.classList.remove('hidden');
+    if (wrap) wrap.classList.add('hidden');
+    if (newWrap) newWrap.classList.add('hidden');
+    if (!list) return;
     list.innerHTML =
       data.threads.length === 0
-        ? '<p class="muted">No threads yet. Start one!</p>'
+        ? '<p class="forum-feed-empty muted">No threads yet. Start one!</p>'
         : data.threads
             .slice()
             .reverse()
@@ -1073,18 +1095,24 @@ fetch('config.json')
               var vote = getThreadVote(t.id);
               var score = (t.score !== undefined ? t.score : 0) + (vote === 1 ? 1 : vote === -1 ? -1 : 0);
               var status = syncingForumId === t.id ? 'syncing' : (t.atUri ? 'synced' : 'local');
-              var badge = '<span class="sync-badge sync-' + status + '">' + (status === 'syncing' ? 'Syncing…' : status === 'synced' ? 'Synced' : 'Local') + '</span>';
+              var replyCount = t.replies ? t.replies.length : 0;
+              var dateStr = t.publishedAt ? new Date(t.publishedAt).toLocaleDateString(undefined, { dateStyle: 'short' }) : '';
+              var byline = 'by ' + escapeHtml(t.author || 'Anonymous') + (dateStr ? ' · ' + dateStr : '');
+              var badge = '<span class="forum-card-badge sync-badge sync-' + status + '">' + (status === 'syncing' ? '…' : status === 'synced' ? '✓' : '') + '</span>';
               return (
-                '<div class="forum-thread-row" data-thread-id="' + t.id + '">' +
-                  '<div class="forum-vote-col">' +
-                    '<button type="button" class="forum-vote-btn forum-vote-up" aria-label="Upvote" title="Upvote">▲</button>' +
+                '<div class="forum-card-wrap forum-thread-row" data-thread-id="' + t.id + '">' +
+                  '<div class="forum-card-vote">' +
+                    '<button type="button" class="forum-vote-btn forum-vote-up" aria-label="Upvote">▲</button>' +
                     '<span class="forum-vote-score">' + score + '</span>' +
-                    '<button type="button" class="forum-vote-btn forum-vote-down" aria-label="Downvote" title="Downvote">▼</button>' +
+                    '<button type="button" class="forum-vote-btn forum-vote-down" aria-label="Downvote">▼</button>' +
                   '</div>' +
-                  '<a href="#" class="forum-thread-card">' +
-                    '<h3>' + escapeHtml(t.title) + '</h3>' +
-                    '<span class="meta">' + escapeHtml(t.author || 'Anonymous') + ' · ' + (t.replies ? t.replies.length : 0) + ' replies</span> ' +
-                    badge +
+                  '<a href="#" class="forum-card forum-thread-card">' +
+                    '<h3 class="forum-card-title">' + escapeHtml(t.title) + '</h3>' +
+                    '<p class="forum-card-byline muted">' + byline + '</p>' +
+                    '<div class="forum-card-meta">' +
+                      '<span class="forum-card-replies">' + replyCount + ' comment' + (replyCount !== 1 ? 's' : '') + '</span>' +
+                      badge +
+                    '</div>' +
                   '</a>' +
                 '</div>'
               );
@@ -1118,12 +1146,14 @@ fetch('config.json')
   }
 
   function openForumGuestPost(data) {
+    updateDocumentVerificationLink(null);
+    lastForumTab = 'community';
     currentForumGuestPost = data || null;
     var discoverEl = document.getElementById('forum-discover');
-    var yourThreadsTitle = document.getElementById('forum-your-threads-title');
+    var minePane = document.getElementById('forum-my-threads-pane');
     var importExport = document.querySelector('#view-forum .forum-import-export');
     if (discoverEl) discoverEl.classList.add('hidden');
-    if (yourThreadsTitle) yourThreadsTitle.classList.add('hidden');
+    if (minePane) minePane.classList.add('hidden');
     document.getElementById('forum-thread-list').classList.add('hidden');
     if (importExport) importExport.classList.add('hidden');
     document.getElementById('forum-thread-view').classList.remove('hidden');
@@ -1153,19 +1183,21 @@ fetch('config.json')
 
   function openThread(id) {
     currentForumGuestPost = null;
+    lastForumTab = 'mine';
     const data = getForumData();
     const thread = data.threads.find(function (t) {
       return t.id === id;
     });
     if (!thread) return;
     var discoverEl = document.getElementById('forum-discover');
-    var yourThreadsTitle = document.getElementById('forum-your-threads-title');
+    var minePane = document.getElementById('forum-my-threads-pane');
     var importExport = document.querySelector('#view-forum .forum-import-export');
     if (discoverEl) discoverEl.classList.add('hidden');
-    if (yourThreadsTitle) yourThreadsTitle.classList.add('hidden');
+    if (minePane) minePane.classList.add('hidden');
     document.getElementById('forum-thread-list').classList.add('hidden');
     if (importExport) importExport.classList.add('hidden');
     document.getElementById('forum-thread-view').classList.remove('hidden');
+    updateDocumentVerificationLink(thread.atUri || null);
     const detail = document.getElementById('forum-thread-detail');
     var meta = escapeHtml(thread.author || 'Anonymous');
     if (thread.publishedAt) {
@@ -1328,6 +1360,8 @@ fetch('config.json')
     const tagsRaw = document.getElementById('forum-new-tags').value.trim();
     const tags = tagsRaw ? tagsRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
     const now = new Date().toISOString();
+    var session = getStoredSession();
+    var author = (session && session.handle) ? ('@' + session.handle) : 'You';
     data.threads.push({
       id: id,
       title: title || 'Untitled',
@@ -1337,14 +1371,13 @@ fetch('config.json')
       tags: tags.length ? tags : undefined,
       publishedAt: now,
       updatedAt: now,
-      author: 'You',
+      author: author,
       replies: []
     });
     setForumData(data);
     document.getElementById('forum-new-view').classList.add('hidden');
     renderThreadList();
     openThread(id);
-    var session = getStoredSession();
     if (session && session.accessJwt && typeof BlendskyLexicon !== 'undefined') {
       doSyncForumThread(id).then(function () {
         renderThreadList();
@@ -1357,12 +1390,14 @@ fetch('config.json')
   });
 
   document.getElementById('forum-back').addEventListener('click', function () {
+    updateDocumentVerificationLink(null);
     currentForumGuestPost = null;
+    setForumTab(lastForumTab);
     var discoverEl = document.getElementById('forum-discover');
-    var yourThreadsTitle = document.getElementById('forum-your-threads-title');
+    var minePane = document.getElementById('forum-my-threads-pane');
     var importExport = document.querySelector('#view-forum .forum-import-export');
     if (discoverEl) discoverEl.classList.remove('hidden');
-    if (yourThreadsTitle) yourThreadsTitle.classList.remove('hidden');
+    if (minePane) minePane.classList.remove('hidden');
     document.getElementById('forum-thread-list').classList.remove('hidden');
     document.getElementById('forum-thread-view').classList.add('hidden');
     document.getElementById('forum-edit-view').classList.add('hidden');
@@ -1455,7 +1490,9 @@ fetch('config.json')
     });
     if (!thread) return;
     if (!thread.replies) thread.replies = [];
-    thread.replies.push({ author: 'You', text: text });
+    var session = getStoredSession();
+    var replyAuthor = (session && session.handle) ? ('@' + session.handle) : 'You';
+    thread.replies.push({ author: replyAuthor, text: text });
     if (thread.updatedAt) thread.updatedAt = new Date().toISOString();
     setForumData(data);
     openThread(id);
@@ -1947,6 +1984,7 @@ fetch('config.json')
             wrapEl.classList.add('forum-discover-loading');
             a.setAttribute('aria-busy', 'true');
             doImportAndOpen(uri).then(function () {
+              lastForumTab = 'community';
               wrapEl.classList.remove('forum-discover-loading');
               a.removeAttribute('aria-busy');
             }).catch(function (err) {
@@ -1998,10 +2036,35 @@ fetch('config.json')
     });
   }
 
+  var lastForumTab = 'community';
+
+  function setForumTab(tab) {
+    lastForumTab = tab;
+    var discover = document.getElementById('forum-discover');
+    var minePane = document.getElementById('forum-my-threads-pane');
+    var tabCommunity = document.getElementById('forum-tab-community');
+    var tabMine = document.getElementById('forum-tab-mine');
+    if (tab === 'community') {
+      if (discover) discover.classList.add('forum-pane-active');
+      if (minePane) minePane.classList.remove('forum-pane-active');
+      if (tabCommunity) tabCommunity.classList.add('forum-tab-active');
+      if (tabMine) tabMine.classList.remove('forum-tab-active');
+    } else {
+      if (discover) discover.classList.remove('forum-pane-active');
+      if (minePane) minePane.classList.add('forum-pane-active');
+      if (tabCommunity) tabCommunity.classList.remove('forum-tab-active');
+      if (tabMine) tabMine.classList.add('forum-tab-active');
+    }
+  }
+
   function initForum() {
     renderThreadList();
     loadForumDiscover();
+    setForumTab(lastForumTab);
   }
+
+  document.getElementById('forum-tab-community').addEventListener('click', function () { setForumTab('community'); });
+  document.getElementById('forum-tab-mine').addEventListener('click', function () { setForumTab('mine'); });
 
   var forumDiscoverRefreshBtn = document.getElementById('forum-discover-refresh-btn');
   if (forumDiscoverRefreshBtn) forumDiscoverRefreshBtn.addEventListener('click', function () { loadForumDiscover(); });

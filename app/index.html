@@ -158,23 +158,25 @@
       </div>
     </section>
 
-    <!-- Forum -->
+    <!-- Forum (piefed.social-style) -->
     <section id="view-forum" class="view">
-      <div class="forum-toolbar">
-        <h2>Forum</h2>
-        <p class="forum-tagline">Synced across accounts — share and remix Blender tutorials. Start a thread, sync to Bluesky, and the community sees it. Geometry node JSON is optional.</p>
-        <button type="button" id="forum-new-thread" class="btn btn-primary">New thread</button>
+      <div class="forum-toolbar forum-toolbar-piefed">
+        <nav class="forum-tabs" aria-label="Forum sections">
+          <button type="button" id="forum-tab-community" class="forum-tab forum-tab-active" data-forum-tab="community">Community</button>
+          <button type="button" id="forum-tab-mine" class="forum-tab" data-forum-tab="mine">My threads</button>
+        </nav>
+        <button type="button" id="forum-new-thread" class="btn btn-primary forum-new-thread-btn">New thread</button>
       </div>
-      <div id="forum-discover" class="forum-discover">
+      <div id="forum-discover" class="forum-discover forum-pane forum-pane-active">
         <div class="forum-discover-header">
-          <h3>Community forum</h3>
           <button type="button" id="forum-discover-refresh-btn" class="btn btn-ghost btn-sm forum-discover-refresh-btn" title="Reload threads from everyone">Refresh</button>
         </div>
-        <p class="forum-discover-hint muted">Threads from Standard.site (<code>site.standard.document</code>) and Bluesky #blendsky-forum so you can find each other's posts. Click a thread to open it. Use <strong>Remix</strong> to copy and adapt. Sync your threads from this app URL so others see them; click <strong>Refresh</strong> to load.</p>
-        <div id="forum-discover-feed" class="forum-discover-feed"><p class="muted" id="forum-discover-loading">Loading…</p></div>
+        <p class="forum-discover-hint muted">Threads from Standard.site and Bluesky #blendsky-forum. Sync your threads so they appear in <a href="https://standard-search.octet-stream.net/" target="_blank" rel="noopener">Standard Search</a>.</p>
+        <div id="forum-discover-feed" class="forum-discover-feed forum-feed-cards"><p class="muted" id="forum-discover-loading">Loading…</p></div>
       </div>
-      <h3 id="forum-your-threads-title" class="forum-your-threads-title">My threads</h3>
-      <div id="forum-thread-list" class="forum-thread-list"></div>
+      <div id="forum-my-threads-pane" class="forum-pane">
+        <div id="forum-thread-list" class="forum-thread-list forum-feed-cards"></div>
+      </div>
       <div id="forum-thread-view" class="forum-thread-view hidden">
         <button type="button" id="forum-back" class="btn btn-ghost">← Back to threads</button>
         <article id="forum-thread-detail"></article>
