@@ -1086,6 +1086,26 @@ fetch('config.json')
     votes['t' + threadId] = value;
     setForumVotes(votes);
   }
+  function getDiscoverVote(uri) {
+    var votes = getForumVotes();
+    var v = votes['u' + uri];
+    return v === 1 ? 1 : v === -1 ? -1 : 0;
+  }
+  function setDiscoverVote(uri, value) {
+    var votes = getForumVotes();
+    votes['u' + uri] = value;
+    setForumVotes(votes);
+  }
+  function getReplyVote(threadId, replyIndex) {
+    var votes = getForumVotes();
+    var v = votes['r' + threadId + '_' + replyIndex];
+    return v === 1 ? 1 : v === -1 ? -1 : 0;
+  }
+  function setReplyVote(threadId, replyIndex, value) {
+    var votes = getForumVotes();
+    votes['r' + threadId + '_' + replyIndex] = value;
+    setForumVotes(votes);
+  }
 
   function renderThreadList() {
     const data = getForumData();
@@ -1186,7 +1206,11 @@ fetch('config.json')
     document.getElementById('forum-replies-list').innerHTML = '';
     document.getElementById('forum-reply-form').dataset.threadId = '';
     var repliesSection = document.querySelector('#view-forum .forum-replies');
-    if (repliesSection) repliesSection.classList.add('hidden');
+    if (repliesSection) {
+      repliesSection.classList.remove('hidden');
+      var hint = repliesSection.querySelector('.forum-replies-hint');
+      if (hint) hint.textContent = 'This post is from Bluesky only. To reply here, import the thread first (paste its AT URI in the box below), then open it from Community.';
+    }
     document.getElementById('forum-thread-standard').classList.add('hidden');
     var threadViewEl = document.getElementById('forum-thread-view');
     if (threadViewEl) threadViewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1252,17 +1276,40 @@ fetch('config.json')
     var replies = thread.replies || [];
     repliesList.innerHTML = replies
       .map(function (r, idx) {
+        var replyVote = getReplyVote(id, idx);
+        var replyScore = replyVote === 1 ? 1 : replyVote === -1 ? -1 : 0;
         return (
-          '<li class="forum-reply-item" data-reply-index="' + idx + '">' +
+          '<li class="forum-reply-item" data-reply-index="' + idx + '" data-thread-id="' + id + '">' +
+          '<div class="forum-reply-vote">' +
+          '<button type="button" class="forum-vote-btn forum-vote-up" aria-label="Upvote">▲</button>' +
+          '<span class="forum-vote-score">' + replyScore + '</span>' +
+          '<button type="button" class="forum-vote-btn forum-vote-down" aria-label="Downvote">▼</button>' +
+          '</div>' +
+          '<div class="forum-reply-body-wrap">' +
           '<div class="forum-reply-header">' +
           '<span class="author">' + escapeHtml(r.author || 'Anonymous') + '</span>' +
           '<button type="button" class="forum-quote-btn btn btn-ghost btn-sm" data-reply-index="' + idx + '" aria-label="Quote this reply">Quote</button>' +
           '</div>' +
           '<div class="forum-reply-text text">' + bodyToHtml(r.text) + '</div>' +
+          '</div>' +
           '</li>'
         );
       })
       .join('');
+    repliesList.querySelectorAll('.forum-reply-vote').forEach(function (voteCol) {
+      var li = voteCol.closest('.forum-reply-item');
+      var threadId = Number(li.getAttribute('data-thread-id'));
+      var replyIndex = parseInt(li.getAttribute('data-reply-index'), 10);
+      var upBtn = voteCol.querySelector('.forum-vote-up');
+      var downBtn = voteCol.querySelector('.forum-vote-down');
+      var scoreEl = voteCol.querySelector('.forum-vote-score');
+      function refreshReplyVote() {
+        var v = getReplyVote(threadId, replyIndex);
+        if (scoreEl) scoreEl.textContent = v === 1 ? 1 : v === -1 ? -1 : 0;
+      }
+      if (upBtn) upBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setReplyVote(threadId, replyIndex, getReplyVote(threadId, replyIndex) === 1 ? 0 : 1); refreshReplyVote(); });
+      if (downBtn) downBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setReplyVote(threadId, replyIndex, getReplyVote(threadId, replyIndex) === -1 ? 0 : -1); refreshReplyVote(); });
+    });
     document.getElementById('forum-reply-form').dataset.threadId = String(id);
     document.getElementById('forum-reply-body').value = '';
     function attachQuoteButtons(threadId) {
@@ -1294,7 +1341,11 @@ fetch('config.json')
       stdWrap.classList.add('hidden');
     }
     var repliesSection = document.querySelector('#view-forum .forum-replies');
-    if (repliesSection) repliesSection.classList.remove('hidden');
+    if (repliesSection) {
+      repliesSection.classList.remove('hidden');
+      var hint = repliesSection.querySelector('.forum-replies-hint');
+      if (hint) hint.innerHTML = '<small>Quote a reply to reference it. Replies stay in the blendsky forum. Add images with the button below. You can reply to any thread you open.</small>';
+    }
     var threadViewEl = document.getElementById('forum-thread-view');
     if (threadViewEl) threadViewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     attachQuoteButtons(id);
@@ -1919,6 +1970,9 @@ fetch('config.json')
         items.forEach(function (item) {
           if (item._type === 'lexicon') {
             var c = item.c;
+            var voteUri = c.uri;
+            var discoverVote = getDiscoverVote(voteUri);
+            var score = discoverVote === 1 ? 1 : discoverVote === -1 ? -1 : 0;
             var profile = c.profile || {};
             var handle = profile.handle || c.did || '?';
             var displayName = profile.displayName || handle;
@@ -1928,28 +1982,36 @@ fetch('config.json')
               ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
               : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
             parts.push(
-              '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '">' +
-                '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to open this thread">' +
-                  '<div class="forum-discover-byline">' +
-                    avatarHtml +
-                    '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
-                    '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+              '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '" data-discover-uri="' + escapeHtml(voteUri) + '">' +
+                '<div class="forum-card-vote">' +
+                  '<button type="button" class="forum-vote-btn forum-vote-up" aria-label="Upvote">▲</button>' +
+                  '<span class="forum-vote-score">' + score + '</span>' +
+                  '<button type="button" class="forum-vote-btn forum-vote-down" aria-label="Downvote">▼</button>' +
+                '</div>' +
+                '<div class="forum-discover-card-inner">' +
+                  '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to open this thread">' +
+                    '<div class="forum-discover-byline">' +
+                      avatarHtml +
+                      '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
+                      '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+                    '</div>' +
+                    '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
+                  '</a>' +
+                  '<div class="forum-discover-meta-actions">' +
+                    (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
+                    '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
+                    '<span class="forum-discover-lexicon-tag">site.standard.document</span>' +
+                    ' <button type="button" class="btn btn-ghost btn-sm forum-discover-remix-btn" title="Copy into a new thread and edit (remix)">Remix</button>' +
                   '</div>' +
-                  '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
-                '</a>' +
-                '<p class="forum-discover-author-meta">' +
-                  (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
-                  '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
-                  '<span class="forum-discover-lexicon-tag">site.standard.document</span>' +
-                '</p>' +
-                '<p class="forum-discover-actions">' +
-                  '<button type="button" class="btn btn-ghost btn-sm forum-discover-remix-btn" title="Copy into a new thread and edit (remix tutorial)">Remix</button>' +
-                '</p>' +
+                '</div>' +
               '</div>'
             );
           } else {
             var c = item.c;
             var p = c.post;
+            var voteUri = p.uri || '';
+            var discoverVote = getDiscoverVote(voteUri);
+            var score = discoverVote === 1 ? 1 : discoverVote === -1 ? -1 : 0;
             var author = p.author || {};
             var handle = author.handle || author.did || '?';
             var displayName = author.displayName || handle;
@@ -1964,19 +2026,26 @@ fetch('config.json')
               ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
               : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
             parts.push(
-              '<div class="forum-discover-card-wrap" data-feed-index="' + feedIdx + '">' +
-                '<a href="#" class="forum-discover-card forum-discover-card-feed" title="Open on site">' +
-                  '<div class="forum-discover-byline">' +
-                    avatarHtml +
-                    '<span class="forum-discover-name">' + escapeHtml(displayName) + '</span>' +
-                    '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+              '<div class="forum-discover-card-wrap" data-feed-index="' + feedIdx + '" data-discover-uri="' + escapeHtml(voteUri) + '">' +
+                '<div class="forum-card-vote">' +
+                  '<button type="button" class="forum-vote-btn forum-vote-up" aria-label="Upvote">▲</button>' +
+                  '<span class="forum-vote-score">' + score + '</span>' +
+                  '<button type="button" class="forum-vote-btn forum-vote-down" aria-label="Downvote">▼</button>' +
+                '</div>' +
+                '<div class="forum-discover-card-inner">' +
+                  '<a href="#" class="forum-discover-card forum-discover-card-feed" title="Open on site">' +
+                    '<div class="forum-discover-byline">' +
+                      avatarHtml +
+                      '<span class="forum-discover-name">' + escapeHtml(displayName) + '</span>' +
+                      '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+                    '</div>' +
+                    '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
+                  '</a>' +
+                  '<div class="forum-discover-meta-actions">' +
+                    (did ? '<span class="forum-discover-did" title="' + escapeHtml(did) + '">DID: ' + escapeHtml(did.length > 32 ? did.slice(0, 24) + '…' : did) + '</span> ' : '') +
+                    '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a>' +
                   '</div>' +
-                  '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
-                '</a>' +
-                '<p class="forum-discover-author-meta">' +
-                  (did ? '<span class="forum-discover-did" title="' + escapeHtml(did) + '">DID: ' + escapeHtml(did.length > 32 ? did.slice(0, 24) + '…' : did) + '</span> ' : '') +
-                  '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a>' +
-                '</p>' +
+                '</div>' +
               '</div>'
             );
           }
@@ -1997,6 +2066,19 @@ fetch('config.json')
           return;
         }
         wrap.innerHTML = parts.join('');
+        wrap.querySelectorAll('.forum-discover-card-wrap[data-discover-uri]').forEach(function (row) {
+          var uri = row.getAttribute('data-discover-uri');
+          if (!uri) return;
+          var upBtn = row.querySelector('.forum-vote-up');
+          var downBtn = row.querySelector('.forum-vote-down');
+          var scoreEl = row.querySelector('.forum-vote-score');
+          function refreshDiscoverVote() {
+            var v = getDiscoverVote(uri);
+            if (scoreEl) scoreEl.textContent = v === 1 ? 1 : v === -1 ? -1 : 0;
+          }
+          if (upBtn) upBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setDiscoverVote(uri, getDiscoverVote(uri) === 1 ? 0 : 1); refreshDiscoverVote(); });
+          if (downBtn) downBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); setDiscoverVote(uri, getDiscoverVote(uri) === -1 ? 0 : -1); refreshDiscoverVote(); });
+        });
         wrap.querySelectorAll('.forum-discover-card-lexicon').forEach(function (a) {
           var wrapEl = a.closest('.forum-discover-card-wrap');
           var uri = wrapEl && wrapEl.getAttribute('data-lexicon-uri');
