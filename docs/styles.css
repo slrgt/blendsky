@@ -2250,8 +2250,6 @@ body {
   font-weight: 600;
 }
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 #view-forum .forum-reply-form textarea {
   border: 1px solid var(--f-border);
   border-radius: var(--f-radius);
@@ -2260,10 +2258,6 @@ body {
 }
 
 /* New / Edit views: minimal form */
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 #view-forum #forum-new-view,
 #view-forum #forum-edit-view {
   padding: 1rem 0;
