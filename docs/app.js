@@ -36,6 +36,35 @@ fetch('config.json')
     if (id === 'wiki') initWiki();
     if (id === 'forum') initForum();
     if (id === 'bluesky') initBluesky();
+    if (id === 'home') loadConstellationStats();
+  }
+
+  function formatStat(n) {
+    if (n == null || isNaN(n)) return '—';
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return String(n);
+  }
+
+  function loadConstellationStats() {
+    var block = document.getElementById('home-constellation');
+    var list = document.getElementById('constellation-stats');
+    if (!block || !list) return;
+    fetch('https://constellation.microcosm.blue/', { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        block.classList.remove('hidden');
+        var s = data.stats || {};
+        list.innerHTML =
+          '<dt>Identities (DIDs)</dt><dd>' + formatStat(s.dids) + '</dd>' +
+          '<dt>Targetables</dt><dd>' + formatStat(s.targetables) + '</dd>' +
+          '<dt>Linking records</dt><dd>' + formatStat(s.linking_records) + '</dd>' +
+          (data.days_indexed != null ? '<dt>Days indexed</dt><dd>' + data.days_indexed + '</dd>' : '');
+      })
+      .catch(function () {
+        block.classList.add('hidden');
+      });
   }
 
   navLinks.forEach(function (a) {
@@ -417,7 +446,65 @@ fetch('config.json')
   });
 
   document.getElementById('forum-back').addEventListener('click', function () {
+    document.getElementById('forum-thread-list').classList.remove('hidden');
+    document.getElementById('forum-thread-view').classList.add('hidden');
+    document.getElementById('forum-edit-view').classList.add('hidden');
     renderThreadList();
+  });
+
+  document.getElementById('forum-edit-thread-btn').addEventListener('click', function () {
+    var wrap = document.getElementById('forum-thread-standard');
+    var id = wrap && wrap.dataset.threadId ? Number(wrap.dataset.threadId) : null;
+    var data = getForumData();
+    var thread = data.threads.find(function (t) { return t.id === id; });
+    if (id == null || !thread) return;
+    document.getElementById('forum-edit-title').value = thread.title || '';
+    document.getElementById('forum-edit-path').value = thread.path ? thread.path.replace(/^\//, '') : '';
+    document.getElementById('forum-edit-description').value = thread.description || '';
+    document.getElementById('forum-edit-body').value = thread.body || '';
+    document.getElementById('forum-edit-tags').value = (thread.tags && thread.tags.length) ? thread.tags.join(', ') : '';
+    document.getElementById('forum-edit-view').dataset.editingThreadId = String(id);
+    document.getElementById('forum-thread-view').classList.add('hidden');
+    document.getElementById('forum-edit-view').classList.remove('hidden');
+  });
+
+  document.getElementById('forum-edit-cancel').addEventListener('click', function () {
+    document.getElementById('forum-edit-view').classList.add('hidden');
+    document.getElementById('forum-thread-view').classList.remove('hidden');
+  });
+
+  document.getElementById('forum-edit-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var id = Number(document.getElementById('forum-edit-view').dataset.editingThreadId);
+    if (!id) return;
+    var data = getForumData();
+    var thread = data.threads.find(function (t) { return t.id === id; });
+    if (!thread) return;
+    thread.title = document.getElementById('forum-edit-title').value.trim() || 'Untitled';
+    thread.body = document.getElementById('forum-edit-body').value.trim();
+    thread.path = document.getElementById('forum-edit-path').value.trim().replace(/^\//, '') || undefined;
+    thread.description = document.getElementById('forum-edit-description').value.trim() || undefined;
+    var tagsRaw = document.getElementById('forum-edit-tags').value.trim();
+    thread.tags = tagsRaw ? tagsRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : undefined;
+    thread.updatedAt = new Date().toISOString();
+    setForumData(data);
+    document.getElementById('forum-edit-view').classList.add('hidden');
+    document.getElementById('forum-thread-view').classList.remove('hidden');
+    openThread(id);
+    renderThreadList();
+    var session = getStoredSession();
+    if (session && session.accessJwt && typeof StandardSite !== 'undefined') {
+      syncingForumId = id;
+      var statusEl = document.getElementById('forum-thread-sync-status');
+      if (statusEl) { statusEl.textContent = 'Syncing…'; statusEl.className = 'sync-status sync-syncing'; }
+      doSyncForumThread(id).then(function () {
+        renderThreadList();
+        openThread(id);
+      }).catch(function (err) {
+        openThread(id);
+        if (err && err.message) alert('Sync failed: ' + err.message);
+      });
+    }
   });
 
   document.getElementById('forum-reply-form').addEventListener('submit', function (e) {
