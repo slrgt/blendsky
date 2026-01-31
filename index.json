@@ -1,0 +1,28 @@
+{
+  "version": "v1",
+  "blocklist": [],
+  "data": [
+    {
+      "schema_version": "1.0.0",
+      "id": "tree_clipper",
+      "name": "Tree Clipper",
+      "tagline": "Export and import Blender node trees as JSON",
+      "version": "0.1.5",
+      "type": "add-on",
+      "maintainer": "Algebraic <tree.clipper@algebraic.games>",
+      "license": [
+        "SPDX:GPL-3.0-or-later"
+      ],
+      "blender_version_min": "5.0.0",
+      "blender_version_max": "5.1.0",
+      "website": "https://github.com/Algebraic-UG/tree_clipper",
+      "tags": [
+        "Import-Export",
+        "Node"
+      ],
+      "archive_url": "./tree_clipper-0.1.5.zip",
+      "archive_size": 51082,
+      "archive_hash": "sha256:ff420d33b7e1c3a98173fac27835433b145f255becc2c2db99f4baf73da061ea"
+    }
+  ]
+}

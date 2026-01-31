@@ -1,0 +1,127 @@
+import bpy
+
+from typing import Callable
+
+_ID_TYPE_TO_DATA_BLOCK: dict[str, Callable[[], bpy.types.bpy_prop_collection]] = {
+    "ACTION": lambda: bpy.data.actions,
+    "ARMATURE": lambda: bpy.data.armatures,
+    "BRUSH": lambda: bpy.data.brushes,
+    "CACHEFILE": lambda: bpy.data.cache_files,
+    "CAMERA": lambda: bpy.data.cameras,
+    "COLLECTION": lambda: bpy.data.collections,
+    "CURVE": lambda: bpy.data.curves,
+    "CURVES": lambda: bpy.data.hair_curves,
+    "FONT": lambda: bpy.data.fonts,
+    "GREASEPENCIL": lambda: bpy.data.annotations,
+    "GREASEPENCIL_V3": lambda: bpy.data.grease_pencils,
+    "IMAGE": lambda: bpy.data.images,
+    "KEY": lambda: bpy.data.shape_keys,
+    "LATTICE": lambda: bpy.data.lattices,
+    "LIBRARY": lambda: bpy.data.libraries,
+    "LIGHT": lambda: bpy.data.lights,
+    "LIGHT_PROBE": lambda: bpy.data.lightprobes,
+    "LINESTYLE": lambda: bpy.data.linestyles,
+    "MASK": lambda: bpy.data.masks,
+    "MATERIAL": lambda: bpy.data.materials,
+    "MESH": lambda: bpy.data.meshes,
+    "META": lambda: bpy.data.metaballs,
+    "MOVIECLIP": lambda: bpy.data.movieclips,
+    "NODETREE": lambda: bpy.data.node_groups,
+    "OBJECT": lambda: bpy.data.objects,
+    "PAINTCURVE": lambda: bpy.data.paint_curves,
+    "PALETTE": lambda: bpy.data.palettes,
+    "PARTICLE": lambda: bpy.data.particles,
+    "POINTCLOUD": lambda: bpy.data.pointclouds,
+    "SCENE": lambda: bpy.data.scenes,
+    "SCREEN": lambda: bpy.data.screens,
+    "SOUND": lambda: bpy.data.sounds,
+    "SPEAKER": lambda: bpy.data.speakers,
+    "TEXT": lambda: bpy.data.texts,
+    "TEXTURE": lambda: bpy.data.textures,
+    "VOLUME": lambda: bpy.data.volumes,
+    "WINDOWMANAGER": lambda: bpy.data.window_managers,
+    "WORKSPACE": lambda: bpy.data.workspaces,
+    "WORLD": lambda: bpy.data.worlds,
+}
+
+_ID_NAME_TO_ID_TYPE: dict[str, str] = {
+    "Action": "ACTION",
+    "Armature": "ARMATURE",
+    "Brush": "BRUSH",
+    "CacheFile": "CACHEFILE",
+    "Camera": "CAMERA",
+    "Collection": "COLLECTION",
+    "Curve": "CURVE",
+    "Curves": "CURVES",
+    "VectorFont": "FONT",
+    "Annotation": "GREASEPENCIL",
+    "GreasePencil": "GREASEPENCIL_V3",
+    "Image": "IMAGE",
+    "Key": "KEY",
+    "Lattice": "LATTICE",
+    "Library": "LIBRARY",
+    "Light": "LIGHT",
+    "LightProbe": "LIGHT_PROBE",
+    "FreestyleLineStyle": "LINESTYLE",
+    "Mask": "MASK",
+    "Material": "MATERIAL",
+    "Mesh": "MESH",
+    "MetaBall": "META",
+    "MovieClip": "MOVIECLIP",
+    "NodeTree": "NODETREE",
+    "Object": "OBJECT",
+    "PaintCurve": "PAINTCURVE",
+    "Palette": "PALETTE",
+    "ParticleSettings": "PARTICLE",
+    "PointCloud": "POINTCLOUD",
+    "Scene": "SCENE",
+    "Screen": "SCREEN",
+    "Sound": "SOUND",
+    "Speaker": "SPEAKER",
+    "Text": "TEXT",
+    "Texture": "TEXTURE",
+    "Volume": "VOLUME",
+    "WindowManager": "WINDOWMANAGER",
+    "WorkSpace": "WORKSPACE",
+    "World": "WORLD",
+}
+
+
+def get_data_block_from_id_name(id_name: str) -> bpy.types.bpy_prop_collection:
+    id_type = _ID_NAME_TO_ID_TYPE[id_name]
+    getter = _ID_TYPE_TO_DATA_BLOCK[id_type]
+    return getter()
+
+
+def _make_getter(
+    block: bpy.types.bpy_prop_collection, name: str
+) -> Callable[[], bpy.types.ID]:
+    return lambda: block[name]  # ty: ignore[non-subscriptable]
+
+
+def make_id_data_getter(obj: bpy.types.ID) -> Callable[[], bpy.types.ID]:
+    if obj is None:
+        return lambda: None
+    assert isinstance(obj, bpy.types.ID)
+    if obj.id_type not in _ID_TYPE_TO_DATA_BLOCK:
+        raise RuntimeError(f"Can not create getter for pointer to {obj.id_type}")
+
+    return _make_getter(_ID_TYPE_TO_DATA_BLOCK[obj.id_type](), obj.name)
+
+
+# see https://github.com/Algebraic-UG/tree_clipper/issues/72
+def canonical_reference(obj: bpy.types.bpy_struct) -> bpy.types.bpy_struct:
+    if not isinstance(obj, bpy.types.ID):
+        return obj
+
+    if isinstance(obj, bpy.types.ShaderNodeTree):
+        return obj
+
+    data_block = _ID_TYPE_TO_DATA_BLOCK[obj.id_type]()
+
+    ref = next((ref for ref in data_block if ref.name == obj.name), None)
+
+    # this is easier to debug than StopIteration
+    assert ref is not None
+
+    return ref

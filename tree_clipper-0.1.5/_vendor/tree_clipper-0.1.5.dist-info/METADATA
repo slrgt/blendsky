@@ -1,0 +1,28 @@
+Metadata-Version: 2.4
+Name: tree-clipper
+Version: 0.1.5
+Summary: Python package to export/import Blender's node trees to/from JSON.
+Author: Vollkornaffe, BradyAJohnston, codeRage, Jan-Hendrik Müller
+Author-email: Vollkornaffe <vollkornaffe@gmail.com>, codeRage <adriandahl@web.de>
+License-Expression: GPL-3.0-or-later
+License-File: LICENSE
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Dist: bpy>=5.0.0,<5.1 ; extra == 'bpy'
+Maintainer: Algebraic
+Maintainer-email: Algebraic <tree.clipper@algebraic.games>
+Requires-Python: >=3.11
+Project-URL: Homepage, https://github.com/Algebraic-UG/tree_clipper
+Project-URL: Issues, https://github.com/Algebraic-UG/tree_clipper/issues
+Provides-Extra: bpy
+Description-Content-Type: text/markdown
+
+![Featured Image](icon.svg)
+
+# Tree Clipper Package
+
+This is the reusable core logic of the Blender extension with the same name.
+
+It is meant to be used in other extensions so they can generate node trees from their respective JSON serializations.
+
+More to follow.
