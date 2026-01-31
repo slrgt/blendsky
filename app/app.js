@@ -6,7 +6,9 @@ fetch('config.json')
   .then(function (r) { return r.json(); })
   .catch(function () { return {}; })
   .then(function (config) {
-    var API = (config && config.apiBase) || '';
+    var apiBase = (config && config.apiBase) || '';
+    // Never use same-origin as OAuth backend (e.g. GitHub Pages has no /api/auth)
+    var API = apiBase && apiBase.replace(/\/$/, '') !== window.location.origin ? apiBase : '';
 
     (function () {
       'use strict';
