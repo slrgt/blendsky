@@ -25,33 +25,32 @@
   <main class="main">
     <!-- Landing (home) -->
     <section id="view-home" class="view view-active">
-      <!-- Very top: trending #b3d + Blender/art feeds, powered by Constellation & UFOs -->
-      <div id="home-trending" class="home-trending">
-        <div class="trending-header">
-          <h2 class="trending-title">Trending #b3d & Blender</h2>
-          <p id="trending-meta" class="trending-meta muted">
-            <a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener">Constellation</a> index ·
-            <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a> lexicons
-          </p>
+      <!-- Top: two columns — Recent (wiki + forum) | From Bluesky (#b3d) -->
+      <div id="home-trending" class="home-trending home-two-col">
+        <div class="home-recent-col">
+          <h2 class="home-col-title">Recent</h2>
+          <p class="home-col-desc muted">Your latest wiki pages and forum threads.</p>
+          <div id="home-recent-feed" class="home-recent-feed"></div>
         </div>
-        <div class="trending-feeds-row">
-          <span class="trending-feeds-label">Feeds:</span>
-          <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener" class="trending-feed-link">#b3d</a>
-          <a href="https://bsky.app/search?q=blender" target="_blank" rel="noopener" class="trending-feed-link">blender</a>
-          <a href="https://bsky.app/search?q=geometry+nodes" target="_blank" rel="noopener" class="trending-feed-link">geometry nodes</a>
-          <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener" class="trending-feed-link">UFOs · what's hot</a>
-          <a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener" class="trending-feed-link">Constellation</a>
-        </div>
-        <div id="home-discover" class="home-discover">
-          <div id="home-discover-feed" class="discover-feed">
-            <p class="muted" id="home-discover-loading">Loading #b3d…</p>
+        <div class="home-bluesky-col">
+          <h2 class="home-col-title">From Bluesky</h2>
+          <p class="home-col-desc muted">Recent #b3d posts. Sync your content to join in.</p>
+          <div id="home-discover" class="home-discover">
+            <div id="home-discover-feed" class="discover-feed">
+              <p class="muted" id="home-discover-loading">Loading…</p>
+            </div>
+            <p class="discover-more">
+              <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">See #b3d on Bluesky</a>
+            </p>
           </div>
-          <p class="discover-more">
-            <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">More #b3d</a>
-            ·
-            <a href="https://ufos.microcosm.blue/all/" target="_blank" rel="noopener">All collections (UFOs)</a>
-          </p>
         </div>
+      </div>
+      <div class="trending-feeds-row">
+        <span class="trending-feeds-label">Explore:</span>
+        <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener" class="trending-feed-link">#b3d</a>
+        <a href="https://bsky.app/search?q=blender" target="_blank" rel="noopener" class="trending-feed-link">blender</a>
+        <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener" class="trending-feed-link">UFOs</a>
+        <a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener" class="trending-feed-link">Constellation</a>
       </div>
       <div class="hero">
         <h1>blendsky</h1>
@@ -123,7 +122,7 @@
     <section id="view-forum" class="view">
       <div class="forum-toolbar">
         <h2>Forum</h2>
-        <p class="forum-tagline">Share JSON geometry node setups, discuss, and sync to Bluesky. Synced threads get #blendsky-forum so others can find and reply.</p>
+        <p class="forum-tagline">Start a thread, reply to others, and sync to Bluesky so the community can find you. Geometry node JSON is optional.</p>
         <button type="button" id="forum-new-thread" class="btn btn-primary">New thread</button>
       </div>
       <div id="forum-discover" class="forum-discover">
@@ -152,24 +151,37 @@
       <div id="forum-new-view" class="forum-new-view hidden">
         <button type="button" id="forum-new-cancel" class="btn btn-ghost">← Cancel</button>
         <form id="forum-new-form" class="forum-new-form">
-          <input type="text" id="forum-new-title" placeholder="Thread title (required)" required />
-          <input type="text" id="forum-new-path" class="forum-optional" placeholder="Path/slug (e.g. /my-post)" />
-          <textarea id="forum-new-description" class="forum-optional" placeholder="Short description (standard.site)" rows="2"></textarea>
-          <textarea id="forum-new-body" placeholder="Paste JSON geometry node setup or write your post…" rows="5" required></textarea>
-          <input type="text" id="forum-new-tags" class="forum-optional" placeholder="Tags, comma-separated" />
+          <label class="form-label">Title</label>
+          <input type="text" id="forum-new-title" class="form-input" placeholder="What's this thread about?" required />
+          <label class="form-label">Your post</label>
+          <textarea id="forum-new-body" class="form-input form-textarea" placeholder="What's on your mind? You can paste a geometry node JSON here if you have one." rows="5"></textarea>
+          <p class="form-hint muted">This will appear on the forum. Sync to Bluesky to share it there.</p>
+          <details class="form-optional">
+            <summary>Optional</summary>
+            <label class="form-label form-label-optional">Link name</label>
+            <input type="text" id="forum-new-path" class="form-input form-input-optional" placeholder="Short name for the link (e.g. my-setup)" />
+            <label class="form-label form-label-optional">Short description</label>
+            <textarea id="forum-new-description" class="form-input form-input-optional" placeholder="One line summary" rows="2"></textarea>
+            <label class="form-label form-label-optional">Tags</label>
+            <input type="text" id="forum-new-tags" class="form-input form-input-optional" placeholder="blender, nodes" />
+          </details>
           <button type="submit" class="btn btn-primary">Create thread</button>
         </form>
       </div>
       <div id="forum-edit-view" class="forum-edit-view hidden">
         <button type="button" id="forum-edit-cancel" class="btn btn-ghost">← Cancel</button>
-        <p class="forum-edit-hint muted">Edits sync to Bluesky — app views like <a href="https://anisota.net" target="_blank" rel="noopener">anisota.net</a> show updated content.</p>
         <form id="forum-edit-form" class="forum-edit-form">
-          <input type="text" id="forum-edit-title" placeholder="Thread title (required)" required />
-          <input type="text" id="forum-edit-path" class="forum-optional" placeholder="Path/slug" />
-          <textarea id="forum-edit-description" class="forum-optional" placeholder="Short description" rows="2"></textarea>
-          <textarea id="forum-edit-body" placeholder="Paste JSON geometry node setup or write your post…" rows="5" required></textarea>
-          <input type="text" id="forum-edit-tags" class="forum-optional" placeholder="Tags, comma-separated" />
-          <button type="submit" class="btn btn-primary">Save changes & sync to Bluesky</button>
+          <label class="form-label">Title</label>
+          <input type="text" id="forum-edit-title" class="form-input" placeholder="Thread title" required />
+          <label class="form-label">Your post</label>
+          <textarea id="forum-edit-body" class="form-input form-textarea" placeholder="Your post or geometry node JSON" rows="5"></textarea>
+          <details class="form-optional">
+            <summary>Optional</summary>
+            <input type="text" id="forum-edit-path" class="form-input form-input-optional" placeholder="Link name" />
+            <textarea id="forum-edit-description" class="form-input form-input-optional" placeholder="Short description" rows="2"></textarea>
+            <input type="text" id="forum-edit-tags" class="form-input form-input-optional" placeholder="Tags" />
+          </details>
+          <button type="submit" class="btn btn-primary">Save & sync to Bluesky</button>
         </form>
       </div>
       <div class="forum-import-export">
