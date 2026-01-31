@@ -46,6 +46,18 @@
           <a href="#" class="cta" data-nav="bluesky">Connect & view feed</a>
         </article>
       </div>
+      <div id="home-discover" class="home-discover">
+        <h2>Discover Blender & #b3d</h2>
+        <p class="discover-intro">Recent posts with <strong>#b3d</strong> on Bluesky — find Blender artists and share geometry node JSON. Explore lexicons and trending collections at <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a>.</p>
+        <div id="home-discover-feed" class="discover-feed">
+          <p class="muted" id="home-discover-loading">Loading…</p>
+        </div>
+        <p class="discover-more">
+          <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">Search #b3d on Bluesky</a>
+          ·
+          <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">Explore lexicons (UFOs)</a>
+        </p>
+      </div>
       <div id="home-constellation" class="home-constellation hidden">
         <h2>AT Protocol index</h2>
         <p class="constellation-intro">Stats from the <a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener">Constellation</a> index (atproto-wide backlinks). Explore lexicons at <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a>.</p>
@@ -138,9 +150,9 @@
         </form>
       </div>
       <div class="forum-import-export">
-        <p class="forum-std-hint">Compatible with <a href="https://standard.site/" target="_blank" rel="noopener">standard.site</a>, <a href="https://tangled.org/mary.my.id/atcute" target="_blank" rel="noopener">atcute</a> (@atcute/standard-site, @atcute/pckt), and pckt.blog. Import from AT URI or export as document.</p>
+        <p class="forum-std-hint">Compatible with <a href="https://standard.site/" target="_blank" rel="noopener">standard.site</a>, <a href="https://tangled.org/mary.my.id/atcute" target="_blank" rel="noopener">atcute</a> (@atcute/standard-site, @atcute/pckt), and pckt.blog. Import from AT URI or pckt.blog URL.</p>
         <div class="forum-import-row">
-          <input type="text" id="forum-import-uri" placeholder="at://did:plc:…/site.standard.document/…" />
+          <input type="text" id="forum-import-uri" placeholder="at://did:plc:… or https://pckt.blog/b/handle/slug" />
           <button type="button" id="forum-import-btn" class="btn btn-secondary">Import document</button>
         </div>
       </div>
