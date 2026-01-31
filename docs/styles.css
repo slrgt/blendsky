@@ -15,6 +15,7 @@
   --font-serif: "Fraunces", Georgia, serif;
   --shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   --section-gap: 2rem;
+  /* Glass / iOS */
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(255, 255, 255, 0.5);
   --glass-blur: 20px;
@@ -1764,6 +1765,7 @@ body {
   line-height: 1;
 }
 
+/* Mobile: bottom nav + larger tap targets and body text */
 @media (max-width: 640px) {
   .bottom-nav {
     display: flex;
@@ -1779,7 +1781,7 @@ body {
   .wiki-edit-body,
   .form-textarea,
   #forum-reply-body {
-    font-size: 16px;
+    font-size: 16px; /* avoids iOS zoom on focus */
     min-height: 120px;
   }
   .wiki-view-actions .btn,
