@@ -1008,7 +1008,43 @@ fetch('config.json')
     });
   }
 
+  function openForumGuestPost(data) {
+    currentForumGuestPost = data || null;
+    var discoverEl = document.getElementById('forum-discover');
+    var yourThreadsTitle = document.getElementById('forum-your-threads-title');
+    var importExport = document.querySelector('#view-forum .forum-import-export');
+    if (discoverEl) discoverEl.classList.add('hidden');
+    if (yourThreadsTitle) yourThreadsTitle.classList.add('hidden');
+    document.getElementById('forum-thread-list').classList.add('hidden');
+    if (importExport) importExport.classList.add('hidden');
+    document.getElementById('forum-thread-view').classList.remove('hidden');
+    var text = (data && data.fullText) ? String(data.fullText) : '';
+    var firstLine = text.split('\n')[0] || text;
+    var title = firstLine.length > 80 ? firstLine.slice(0, 77) + '\u2026' : firstLine || 'Post';
+    var handle = (data && data.handle) ? data.handle : '?';
+    var displayName = (data && data.displayName) ? data.displayName : handle;
+    var postUrl = (data && data.postUri) ? data.postUri : '#';
+    var body = '<div class="forum-thread-detail-header">' +
+      '<div class="forum-thread-detail-main">' +
+        '<h2>' + escapeHtml(title) + '</h2>' +
+        '<p class="meta">' + escapeHtml(displayName) + ' \u00b7 @' + escapeHtml(handle) + '</p>' +
+        '<p class="sync-status sync-synced">From Bluesky</p>' +
+        '<div class="forum-op-label">Post</div>' +
+        '<div class="forum-reply forum-op text forum-body-html">' + simpleMarkdown(text) + '</div>' +
+        '<p class="forum-view-on-bluesky forum-guest-actions"><a href="' + escapeHtml(postUrl) + '" target="_blank" rel="noopener" class="btn btn-secondary">View on Bluesky</a></p>' +
+      '</div></div>';
+    document.getElementById('forum-thread-detail').innerHTML = body;
+    document.getElementById('forum-replies-list').innerHTML = '';
+    document.getElementById('forum-reply-form').dataset.threadId = '';
+    var repliesSection = document.querySelector('#view-forum .forum-replies');
+    if (repliesSection) repliesSection.classList.add('hidden');
+    document.getElementById('forum-thread-standard').classList.add('hidden');
+    var threadViewEl = document.getElementById('forum-thread-view');
+    if (threadViewEl) threadViewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   function openThread(id) {
+    currentForumGuestPost = null;
     const data = getForumData();
     const thread = data.threads.find(function (t) {
       return t.id === id;
@@ -1066,19 +1102,43 @@ fetch('config.json')
       });
     });
     const repliesList = document.getElementById('forum-replies-list');
-    repliesList.innerHTML = (thread.replies || [])
-      .map(function (r) {
+    var replies = thread.replies || [];
+    repliesList.innerHTML = replies
+      .map(function (r, idx) {
         return (
-          '<li class="forum-reply"><span class="author">' +
-          escapeHtml(r.author || 'Anonymous') +
-          '</span><div class="text">' +
-          bodyToHtml(r.text) +
-          '</div></li>'
+          '<li class="forum-reply-item" data-reply-index="' + idx + '">' +
+          '<div class="forum-reply-header">' +
+          '<span class="author">' + escapeHtml(r.author || 'Anonymous') + '</span>' +
+          '<button type="button" class="forum-quote-btn btn btn-ghost btn-sm" data-reply-index="' + idx + '" aria-label="Quote this reply">Quote</button>' +
+          '</div>' +
+          '<div class="forum-reply-text text">' + bodyToHtml(r.text) + '</div>' +
+          '</li>'
         );
       })
       .join('');
     document.getElementById('forum-reply-form').dataset.threadId = String(id);
     document.getElementById('forum-reply-body').value = '';
+    function attachQuoteButtons(threadId) {
+      var data = getForumData();
+      var th = data.threads.find(function (t) { return t.id === threadId; });
+      var replyList = (th && th.replies) || [];
+      repliesList.querySelectorAll('.forum-quote-btn').forEach(function (btn) {
+        var idx = parseInt(btn.getAttribute('data-reply-index'), 10);
+        var r = replyList[idx];
+        if (!r) return;
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          var plain = (r.text || '').replace(/\n/g, '\n> ');
+          var quote = '> ' + (r.author || 'Anonymous') + ' wrote:\n> ' + plain + '\n\n';
+          var ta = document.getElementById('forum-reply-body');
+          if (ta) {
+            ta.value = quote + (ta.value ? '\n' + ta.value : '');
+            ta.focus();
+            ta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        });
+      });
+    }
     var stdWrap = document.getElementById('forum-thread-standard');
     stdWrap.dataset.threadId = String(id);
     if (thread.author === 'You') {
@@ -1086,8 +1146,11 @@ fetch('config.json')
     } else {
       stdWrap.classList.add('hidden');
     }
+    var repliesSection = document.querySelector('#view-forum .forum-replies');
+    if (repliesSection) repliesSection.classList.remove('hidden');
     var threadViewEl = document.getElementById('forum-thread-view');
     if (threadViewEl) threadViewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    attachQuoteButtons(id);
   }
 
   document.getElementById('forum-new-thread').addEventListener('click', function () {
@@ -1190,6 +1253,7 @@ fetch('config.json')
   });
 
   document.getElementById('forum-back').addEventListener('click', function () {
+    currentForumGuestPost = null;
     var discoverEl = document.getElementById('forum-discover');
     var yourThreadsTitle = document.getElementById('forum-your-threads-title');
     var importExport = document.querySelector('#view-forum .forum-import-export');
@@ -1199,6 +1263,8 @@ fetch('config.json')
     document.getElementById('forum-thread-view').classList.add('hidden');
     document.getElementById('forum-edit-view').classList.add('hidden');
     if (importExport) importExport.classList.remove('hidden');
+    var repliesSection = document.querySelector('#view-forum .forum-replies');
+    if (repliesSection) repliesSection.classList.remove('hidden');
     renderThreadList();
   });
 
@@ -1813,7 +1879,7 @@ fetch('config.json')
           if (!data) return;
           a.addEventListener('click', function (e) {
             e.preventDefault();
-            openPostViewer(data);
+            openForumGuestPost(data);
           });
         });
       });
@@ -2135,6 +2201,7 @@ fetch('config.json')
 
   var syncingWikiSlug = null;
   var syncingForumId = null;
+  var currentForumGuestPost = null;
 
   /** Full sync: put site.standard.document (Standard.site) + post feed. Updates page.atUri. Refreshes token if expired; if document put fails, still posts feed so others find via #blendsky-wiki. */
   function doSyncWikiPage(slug) {

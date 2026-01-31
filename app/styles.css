@@ -1308,16 +1308,63 @@ body {
   border-top: 1px solid var(--border);
 }
 
+#forum-replies-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+
 .forum-thread-view .forum-replies h3 {
   font-size: 1rem;
   margin: 0 0 1rem;
 }
 
-.forum-reply {
-  padding: 1rem;
+/* Thread view: OP and reply list */
+.forum-thread-view #forum-thread-detail {
+  margin-bottom: 0;
+}
+
+.forum-reply,
+.forum-reply-item {
+  padding: 1rem 1.25rem;
   background: var(--bg);
-  border-radius: 8px;
+  border-radius: var(--radius);
   margin-bottom: 0.75rem;
+}
+
+.forum-reply-item {
+  border-left: 3px solid var(--accent);
+  margin-left: 0.5rem;
+}
+
+.forum-reply-item .forum-reply-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.forum-reply-item .forum-reply-header .author {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.forum-quote-btn {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.forum-quote-btn:hover {
+  color: var(--accent);
+}
+
+.forum-reply .author,
+.forum-reply-item .forum-reply-text {
+  font-size: 0.95rem;
+  color: var(--text);
 }
 
 .forum-reply .author {
@@ -1326,15 +1373,33 @@ body {
   margin-bottom: 0.25rem;
 }
 
-.forum-reply .text {
+.forum-reply .text,
+.forum-reply .forum-reply-text {
   font-size: 0.95rem;
   color: var(--text);
 }
 
-.forum-reply .text .user-content-img {
+/* Quoted text inside replies (markdown blockquote) */
+.forum-reply-text blockquote,
+.forum-reply .text blockquote {
+  margin: 0.5rem 0;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 0.9em;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.forum-reply .text .user-content-img,
+.forum-reply-text .user-content-img {
   max-height: 320px;
   object-fit: contain;
   border-radius: var(--radius);
+}
+
+.forum-guest-actions {
+  margin-top: 1rem;
 }
 
 .forum-reply-form {
