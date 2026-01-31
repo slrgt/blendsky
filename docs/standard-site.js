@@ -12,6 +12,24 @@
   const NS_DOCUMENT = 'site.standard.document';
   const NS_PUBLICATION = 'site.standard.publication';
 
+  /** site.standard.document record shape for a wiki page (same lexicon as threads/posts) */
+  function documentFromWikiPage(page, slug, baseUrl) {
+    const now = new Date().toISOString();
+    const body = page.body || '';
+    return {
+      $type: NS_DOCUMENT,
+      site: baseUrl || (typeof location !== 'undefined' ? location.origin : ''),
+      path: '/' + (slug || 'untitled').replace(/^\//, ''),
+      title: page.title || 'Untitled',
+      description: '',
+      textContent: body.replace(/\n/g, ' ').slice(0, 300),
+      tags: [],
+      publishedAt: page.publishedAt || now,
+      updatedAt: page.updatedAt || now,
+      content: body
+    };
+  }
+
   /** site.standard.document record shape (metadata for a post/article) */
   function documentFromThread(thread, baseUrl) {
     const now = new Date().toISOString();
@@ -78,6 +96,7 @@
   global.StandardSite = {
     NS_DOCUMENT: NS_DOCUMENT,
     NS_PUBLICATION: NS_PUBLICATION,
+    documentFromWikiPage: documentFromWikiPage,
     documentFromThread: documentFromThread,
     threadToDocumentShape: threadToDocumentShape,
     parseAtUri: parseAtUri,

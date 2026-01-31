@@ -65,7 +65,10 @@
           <div id="wiki-view" class="wiki-view">
             <h1 id="wiki-title"></h1>
             <div id="wiki-body" class="wiki-body"></div>
-            <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
+            <div class="wiki-view-actions">
+              <button type="button" id="wiki-edit-btn" class="btn btn-secondary">Edit</button>
+              <button type="button" id="wiki-sync-bluesky" class="btn btn-secondary">Sync to Bluesky</button>
+            </div>
           </div>
           <div id="wiki-edit" class="wiki-edit hidden">
             <input type="text" id="wiki-edit-title" class="wiki-edit-title" placeholder="Page title" />
@@ -91,6 +94,7 @@
         <article id="forum-thread-detail"></article>
         <div id="forum-thread-standard" class="forum-thread-standard hidden">
           <button type="button" id="forum-export-standard" class="btn btn-secondary">Export as standard.site document</button>
+          <button type="button" id="forum-sync-bluesky" class="btn btn-secondary">Sync to Bluesky</button>
         </div>
         <section class="forum-replies">
           <h3>Replies</h3>

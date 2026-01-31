@@ -178,6 +178,38 @@ fetch('config.json')
     else initWiki();
   });
 
+  document.getElementById('wiki-sync-bluesky').addEventListener('click', function () {
+    if (!currentWikiSlug) return;
+    var pages = getWikiPages();
+    var page = pages[currentWikiSlug];
+    if (!page || typeof StandardSite === 'undefined') return;
+    var session = getStoredSession();
+    if (!session || !session.accessJwt) {
+      alert('Connect your Bluesky account first (Bluesky tab).');
+      return;
+    }
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+    var baseUrl = typeof location !== 'undefined' ? location.origin : '';
+    var record = StandardSite.documentFromWikiPage(page, currentWikiSlug, baseUrl);
+    var rkey = sanitizeRkey(currentWikiSlug);
+    putRecordToBluesky(StandardSite.NS_DOCUMENT, rkey, record)
+      .then(function (res) {
+        page.atUri = res.uri;
+        page.updatedAt = new Date().toISOString();
+        pages[currentWikiSlug] = page;
+        setWikiPages(pages);
+        btn.textContent = 'Synced to Bluesky';
+        setTimeout(function () { btn.textContent = 'Sync to Bluesky'; }, 2000);
+      })
+      .catch(function (err) {
+        alert('Sync failed: ' + (err.message || 'unknown'));
+        btn.textContent = 'Sync to Bluesky';
+      })
+      .then(function () { btn.disabled = false; });
+  });
+
   document.getElementById('wiki-search').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') {
       const q = this.value.trim().toLowerCase();
@@ -374,6 +406,40 @@ fetch('config.json')
     URL.revokeObjectURL(a.href);
   });
 
+  document.getElementById('forum-sync-bluesky').addEventListener('click', function () {
+    var wrap = document.getElementById('forum-thread-standard');
+    var id = wrap && wrap.dataset.threadId ? Number(wrap.dataset.threadId) : null;
+    var data = getForumData();
+    var thread = data.threads.find(function (t) { return t.id === id; });
+    if (id == null || !thread || typeof StandardSite === 'undefined') return;
+    var session = getStoredSession();
+    if (!session || !session.accessJwt) {
+      alert('Connect your Bluesky account first (Bluesky tab).');
+      return;
+    }
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+    var baseUrl = typeof location !== 'undefined' ? location.origin : '';
+    var doc = StandardSite.documentFromThread(thread, baseUrl);
+    var record = { $type: StandardSite.NS_DOCUMENT, ...doc, content: thread.body || '' };
+    var rkey = sanitizeRkey(thread.path || 'thread-' + thread.id);
+    putRecordToBluesky(StandardSite.NS_DOCUMENT, rkey, record)
+      .then(function (res) {
+        thread.atUri = res.uri;
+        thread.updatedAt = new Date().toISOString();
+        setForumData(data);
+        openThread(id);
+        btn.textContent = 'Synced to Bluesky';
+        setTimeout(function () { btn.textContent = 'Sync to Bluesky'; }, 2000);
+      })
+      .catch(function (err) {
+        alert('Sync failed: ' + (err.message || 'unknown'));
+        btn.textContent = 'Sync to Bluesky';
+      })
+      .then(function () { btn.disabled = false; });
+  });
+
   function fetchAtRecord(uri) {
     var parts = uri.replace(/^at:\/\//, '').split('/');
     if (parts.length < 3) return Promise.reject(new Error('Invalid AT URI'));
@@ -464,6 +530,48 @@ fetch('config.json')
         return svc ? (svc.serviceEndpoint || DEFAULT_PDS) : DEFAULT_PDS;
       })
       .catch(function () { return DEFAULT_PDS; });
+  }
+
+  /** Ensure session has did (resolve from handle if missing). */
+  function ensureSessionDid(session) {
+    if (session.did) return Promise.resolve(session);
+    if (!session.handle) return Promise.reject(new Error('No handle or DID'));
+    return resolveHandle(session.handle).then(function (did) {
+      if (!did) return Promise.reject(new Error('Could not resolve DID'));
+      session.did = did;
+      setStoredSession(session);
+      return session;
+    });
+  }
+
+  /** Put a site.standard.document (or other record) into the logged-in user's Bluesky repo. */
+  function putRecordToBluesky(collection, rkey, record) {
+    var session = getStoredSession();
+    if (!session || !session.accessJwt || !session.pdsUrl) return Promise.reject(new Error('Not connected to Bluesky'));
+    return ensureSessionDid(session).then(function (s) {
+      var url = s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.repo.putRecord';
+      return fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + s.accessJwt
+        },
+        body: JSON.stringify({
+          repo: s.did,
+          collection: collection,
+          rkey: rkey,
+          record: record
+        })
+      }).then(function (res) {
+        if (!res.ok) return res.json().then(function (err) { throw new Error(err.message || err.error || res.statusText); });
+        return res.json();
+      });
+    });
+  }
+
+  /** Sanitize string for use as AT record rkey (alphanumeric, dots, underscores, hyphens). */
+  function sanitizeRkey(s) {
+    return String(s).replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'untitled';
   }
 
   function renderBlueskyFeed(items, append) {
@@ -634,6 +742,7 @@ fetch('config.json')
           setStoredSession({
             accessJwt: data.accessJwt,
             refreshJwt: data.refreshJwt,
+            did: data.did,
             handle: data.handle || handle,
             pdsUrl: pdsUrl
           });
