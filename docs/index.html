@@ -23,77 +23,59 @@
   </header>
 
   <main class="main">
-    <!-- Landing (home) -->
+    <!-- Home -->
     <section id="view-home" class="view view-active">
-      <!-- Top: two columns — Recent (wiki + forum) | From Bluesky (#b3d) -->
-      <div id="home-trending" class="home-trending home-two-col">
-        <div class="home-recent-col">
-          <h2 class="home-col-title">Recent</h2>
-          <p id="home-recent-desc" class="home-col-desc muted">Your latest wiki pages and forum threads.</p>
-          <div id="home-recent-feed" class="home-recent-feed"></div>
-        </div>
-        <div class="home-bluesky-col">
-          <h2 class="home-col-title">From Bluesky</h2>
-          <p class="home-col-desc muted">Recent #b3d posts. Sync your content to join in.</p>
-          <div id="home-discover" class="home-discover">
-            <div id="home-discover-feed" class="discover-feed">
-              <p class="muted" id="home-discover-loading">Loading…</p>
-            </div>
-            <p class="discover-more">
-              <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">See #b3d on Bluesky</a>
-            </p>
+      <section class="home-section home-recent-section">
+        <h2 class="home-section-title">Recent forum posts &amp; wiki articles</h2>
+        <p id="home-recent-desc" class="home-section-desc muted">Your latest wiki pages and forum threads.</p>
+        <div id="home-recent-feed" class="home-recent-feed"></div>
+      </section>
+
+      <section class="home-section home-carousel-section">
+        <h2 class="home-section-title">Trending #b3d</h2>
+        <p class="home-section-desc muted">Recent Blender posts on Bluesky.</p>
+        <div class="home-carousel-wrap">
+          <div id="home-discover-feed" class="home-carousel-track">
+            <p class="muted" id="home-discover-loading">Loading…</p>
           </div>
+          <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener" class="home-carousel-more">See more #b3d on Bluesky →</a>
         </div>
-      </div>
-      <div class="trending-feeds-row">
-        <span class="trending-feeds-label">Explore:</span>
-        <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener" class="trending-feed-link">#b3d</a>
-        <a href="https://bsky.app/search?q=blender" target="_blank" rel="noopener" class="trending-feed-link">blender</a>
-        <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener" class="trending-feed-link">UFOs</a>
-        <a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener" class="trending-feed-link">Constellation</a>
-      </div>
-      <div class="hero">
-        <h1>blendsky</h1>
-        <p class="lead">A forum for Blender users sharing JSON geometry node setups. Post node trees, docs, and discuss—then sync to Bluesky so the community can find you.</p>
-      </div>
-      <div class="features">
-        <article class="feature">
-          <h2>Wiki</h2>
-          <p>Document your geometry node setups. Write guides, notes, and reference pages in Markdown.</p>
-          <a href="#" class="cta" data-nav="wiki">Go to Wiki</a>
-        </article>
-        <article class="feature">
-          <h2>Forum</h2>
-          <p>Share JSON geometry node setups, start threads, and reply. Import/export standard.site documents and sync to Bluesky.</p>
-          <a href="#" class="cta" data-nav="forum">Go to Forum</a>
-        </article>
-        <article class="feature">
-          <h2>Bluesky</h2>
-          <p>Connect your account and see your feed here. Your wiki and forum posts can sync to Bluesky as threads.</p>
-          <a href="#" class="cta" data-nav="bluesky">Connect & view feed</a>
-        </article>
-      </div>
-      <div id="home-constellation" class="home-constellation hidden">
-        <h2>AT Protocol index</h2>
-        <p class="constellation-intro">Stats from the <a href="https://constellation.microcosm.blue/" target="_blank" rel="noopener">Constellation</a> index (atproto-wide backlinks). Explore lexicons at <a href="https://ufos.microcosm.blue/" target="_blank" rel="noopener">UFOs</a>.</p>
-        <dl class="constellation-stats" id="constellation-stats"></dl>
-      </div>
-      <p class="ready">Ready to share?</p>
-      <p class="sub">Use <strong>Wiki</strong> for docs, <strong>Forum</strong> for JSON node setups and discussion, and <strong>Bluesky</strong> to connect.</p>
+      </section>
+
+      <section id="home-bluesky-section" class="home-section home-feed-section hidden">
+        <h2 class="home-section-title">Your Bluesky feed</h2>
+        <p class="home-section-desc muted">Posts from people you follow.</p>
+        <div id="home-bluesky-feed" class="home-bluesky-feed"></div>
+        <button type="button" id="home-bluesky-load-more" class="btn btn-secondary hidden">Load more</button>
+      </section>
+
+      <section class="home-section home-actions">
+        <p class="home-actions-lead">Wiki · Forum · Bluesky</p>
+        <p class="home-actions-sub muted">Document node setups, share threads, and connect your feed.</p>
+        <nav class="home-actions-nav">
+          <a href="#" class="btn btn-primary" data-nav="wiki">Wiki</a>
+          <a href="#" class="btn btn-secondary" data-nav="forum">Forum</a>
+          <a href="#" class="btn btn-secondary" data-nav="bluesky">Bluesky</a>
+        </nav>
+      </section>
     </section>
 
-    <!-- Wiki -->
-    <section id="view-wiki" class="view">
-      <div class="wiki-toolbar">
-        <input type="text" id="wiki-search" class="wiki-search" placeholder="Search or create page (e.g. node setup docs)…" />
-        <button type="button" id="wiki-new" class="btn btn-primary">New page</button>
+    <!-- Wiki (Wikipedia-style) -->
+    <section id="view-wiki" class="view view-wiki">
+      <div class="wiki-toolbar wiki-toolbar-wikipedia">
+        <div class="wiki-toolbar-inner">
+          <input type="text" id="wiki-search" class="wiki-search" placeholder="Search or create page…" />
+          <button type="button" id="wiki-new" class="btn btn-primary">New page</button>
+        </div>
       </div>
-      <div class="wiki-content">
-        <aside class="wiki-sidebar">
-          <h3>Pages</h3>
-          <ul id="wiki-list" class="wiki-list"></ul>
+      <div class="wiki-content wiki-content-wikipedia">
+        <aside class="wiki-sidebar wiki-sidebar-wikipedia">
+          <div class="wiki-sidebar-inner">
+            <h3 class="wiki-sidebar-title">Contents</h3>
+            <ul id="wiki-list" class="wiki-list"></ul>
+          </div>
         </aside>
-        <article class="wiki-main">
+        <article class="wiki-main wiki-main-wikipedia">
           <div id="wiki-view" class="wiki-view">
             <h1 id="wiki-title"></h1>
             <p id="wiki-sync-status" class="sync-status" aria-live="polite"></p>
