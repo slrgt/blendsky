@@ -19,7 +19,7 @@ jobs:
       - name: Copy app to docs
         run: |
           mkdir -p docs
-          cp app/index.html app/app.js app/standard-site.js app/styles.css docs/
+          cp app/index.html app/app.js app/standard-site.js app/styles.css app/config.json docs/
           touch docs/.nojekyll
 
       - name: Commit and push if changed

@@ -25,8 +25,21 @@ Your site will be at **`https://<username>.github.io/<repo>/`** (e.g. `https://u
 
 ## 3. What works on GitHub Pages
 
-- **Wiki** and **Forum** work (data in browser localStorage).
-- **Bluesky OAuth and feed** do **not** work on GitHub Pages — there is no backend. The Bluesky section will show “Connect with Bluesky” but the redirect and API calls need the Node server. To use Bluesky, run the server locally (`cd server && npm start`) or deploy the server elsewhere and point the app at it.
+Everything works on GitHub Pages with **no backend**. Data and auth use the browser and the AT Protocol.
+
+- **Wiki** and **Forum** — data is stored in the browser (localStorage). Forum threads can be exported/imported as AT Protocol records (e.g. `site.standard.document`).
+- **Bluesky** — with the default config (no `apiBase`), use your Bluesky handle and an [app password](https://bsky.app/settings/app-passwords). The app talks to the AT Protocol (your PDS) directly from the browser. No server is required.
+
+### Optional: OAuth via your own server
+
+If you prefer **OAuth** ("Connect with Bluesky") instead of app passwords, you can run the optional Node server elsewhere and point the app at it:
+
+1. Deploy the **server** (in `server/`) to a host that runs Node (e.g. [Railway](https://railway.app), [Render](https://render.com), [Fly.io](https://fly.io)). Set `BASE_URL` to that server URL and configure `BLUESKY_OAUTH_PRIVATE_KEY`.
+2. In **`docs/config.json`** (or **`app/config.json`** before the next sync), set **`apiBase`** to that server URL:
+   ```json
+   { "apiBase": "https://your-server.railway.app" }
+   ```
+3. Push. The app will use "Connect with Bluesky" and OAuth via your server. After login, the server redirects to its own URL; use that URL for the OAuth flow, or run app and server together locally.
 
 ## 4. Optional: Custom domain
 

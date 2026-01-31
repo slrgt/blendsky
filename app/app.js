@@ -2,12 +2,21 @@
  * blendsky — wikis, forums & Bluesky feed (timeline from who you follow)
  */
 
-(function () {
-  'use strict';
+fetch('config.json')
+  .then(function (r) { return r.json(); })
+  .catch(function () { return {}; })
+  .then(function (config) {
+    var API = (config && config.apiBase) || '';
 
-  const STORAGE_WIKI = 'blendsky_wiki';
-  const STORAGE_FORUM = 'blendsky_forum';
-  const API = ''; // same origin when served by server
+    (function () {
+      'use strict';
+
+  var STORAGE_WIKI = 'blendsky_wiki';
+  var STORAGE_FORUM = 'blendsky_forum';
+  var STORAGE_BSKY = 'blendsky_session';
+  var DEFAULT_PDS = 'https://bsky.social';
+  var APP_VIEW = 'https://api.bsky.app';
+  var PLC_DIRECTORY = 'https://plc.directory';
 
   // ——— Navigation ———
   const views = document.querySelectorAll('.view');
@@ -363,23 +372,51 @@
     URL.revokeObjectURL(a.href);
   });
 
+  function fetchAtRecord(uri) {
+    var parts = uri.replace(/^at:\/\//, '').split('/');
+    if (parts.length < 3) return Promise.reject(new Error('Invalid AT URI'));
+    var repo = parts[0];
+    var collection = parts[1];
+    var rkey = parts.slice(2).join('/');
+    var params = 'repo=' + encodeURIComponent(repo) + '&collection=' + encodeURIComponent(collection) + '&rkey=' + encodeURIComponent(rkey);
+    var url = APP_VIEW + '/xrpc/com.atproto.repo.getRecord?' + params;
+    return fetch(url)
+      .then(function (res) {
+        if (res.ok) return res.json();
+        if (repo.indexOf('did:') === 0) {
+          return getPdsFromDid(repo).then(function (pdsUrl) {
+            return fetch(pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.repo.getRecord?' + params).then(function (r2) {
+              if (!r2.ok) throw new Error(r2.statusText);
+              return r2.json();
+            });
+          });
+        }
+        throw new Error(res.statusText);
+      })
+      .then(function (data) {
+        return { value: data.value, uri: data.uri, repo: repo, record: data.value };
+      });
+  }
+
   document.getElementById('forum-import-btn').addEventListener('click', function () {
-    const uriInput = document.getElementById('forum-import-uri');
-    const uri = (uriInput && uriInput.value && uriInput.value.trim()) || '';
+    var uriInput = document.getElementById('forum-import-uri');
+    var uri = (uriInput && uriInput.value && uriInput.value.trim()) || '';
     if (!uri || uri.indexOf('at://') !== 0) {
       alert('Enter a valid AT URI (e.g. at://did:plc:…/site.standard.document/…)');
       return;
     }
-    fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' })
-      .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
+    var req = API
+      ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
+      : fetchAtRecord(uri);
+    req
       .then(function (data) {
         if (typeof StandardSite === 'undefined') throw new Error('StandardSite not loaded');
-        const record = data.value || data.record || data;
-        const author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
-        const thread = StandardSite.recordToThread(record, uri, author);
+        var record = data.value || data.record || data;
+        var author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
+        var thread = StandardSite.recordToThread(record, uri, author);
         if (!thread) throw new Error('Could not parse document');
-        const forumData = getForumData();
-        const newId = forumData.nextId++;
+        var forumData = getForumData();
+        var newId = forumData.nextId++;
         thread.id = newId;
         forumData.threads.push(thread);
         setForumData(forumData);
@@ -396,7 +433,37 @@
     renderThreadList();
   }
 
-  // ——— Bluesky (OAuth + timeline from who you follow) ———
+  // ——— Bluesky (serverless: app password + PDS, or server: OAuth) ———
+  function getStoredSession() {
+    try {
+      var raw = localStorage.getItem(STORAGE_BSKY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function setStoredSession(session) {
+    if (session) localStorage.setItem(STORAGE_BSKY, JSON.stringify(session));
+    else localStorage.removeItem(STORAGE_BSKY);
+  }
+
+  function resolveHandle(handle) {
+    return fetch(DEFAULT_PDS + '/xrpc/com.atproto.identity.resolveHandle?handle=' + encodeURIComponent(handle))
+      .then(function (r) { return r.json(); })
+      .then(function (data) { return data.did || null; });
+  }
+
+  function getPdsFromDid(did) {
+    return fetch(PLC_DIRECTORY + '/' + encodeURIComponent(did))
+      .then(function (r) { return r.json(); })
+      .then(function (doc) {
+        var svc = doc.service && doc.service.find(function (s) { return s.type === 'AtprotoPersonalDataServer'; });
+        return svc ? (svc.serviceEndpoint || DEFAULT_PDS) : DEFAULT_PDS;
+      })
+      .catch(function () { return DEFAULT_PDS; });
+  }
+
   function renderBlueskyFeed(items, append) {
     const wrap = document.getElementById('bluesky-feed');
     if (!append) wrap.innerHTML = '';
@@ -424,18 +491,42 @@
   }
 
   function loadBlueskyTimeline(cursor, append) {
-    var url = API + '/api/bluesky/timeline?limit=30';
+    if (API) {
+      var url = API + '/api/bluesky/timeline?limit=30';
+      if (cursor) url += '&cursor=' + encodeURIComponent(cursor);
+      return fetch(url, { credentials: 'include' })
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.status === 401 ? 'Not connected' : res.statusText);
+          return res.json();
+        })
+        .then(function (data) {
+          var items = data.feed || [];
+          renderBlueskyFeed(items, append);
+          var nextCursor = data.cursor;
+          var loadMore = document.getElementById('bluesky-load-more');
+          if (nextCursor) {
+            loadMore.classList.remove('hidden');
+            loadMore.dataset.cursor = nextCursor;
+          } else {
+            loadMore.classList.add('hidden');
+          }
+          return data;
+        });
+    }
+    var session = getStoredSession();
+    if (!session || !session.accessJwt || !session.pdsUrl) return Promise.reject(new Error('Not connected'));
+    var url = session.pdsUrl.replace(/\/$/, '') + '/xrpc/app.bsky.feed.getTimeline?limit=30';
     if (cursor) url += '&cursor=' + encodeURIComponent(cursor);
-    return fetch(url, { credentials: 'include' })
+    return fetch(url, { headers: { Authorization: 'Bearer ' + session.accessJwt } })
       .then(function (res) {
         if (!res.ok) throw new Error(res.status === 401 ? 'Not connected' : res.statusText);
         return res.json();
       })
       .then(function (data) {
-        const items = data.feed || [];
+        var items = data.feed || [];
         renderBlueskyFeed(items, append);
-        const nextCursor = data.cursor;
-        const loadMore = document.getElementById('bluesky-load-more');
+        var nextCursor = data.cursor;
+        var loadMore = document.getElementById('bluesky-load-more');
         if (nextCursor) {
           loadMore.classList.remove('hidden');
           loadMore.dataset.cursor = nextCursor;
@@ -447,55 +538,139 @@
   }
 
   function initBluesky() {
-    const connect = document.getElementById('bluesky-connect');
-    const feedWrap = document.getElementById('bluesky-feed-wrap');
-    const feed = document.getElementById('bluesky-feed');
-    const userSpan = document.getElementById('bluesky-user');
+    var connect = document.getElementById('bluesky-connect');
+    var feedWrap = document.getElementById('bluesky-feed-wrap');
+    var feed = document.getElementById('bluesky-feed');
+    var userSpan = document.getElementById('bluesky-user');
+    var appPw = document.getElementById('bluesky-app-password');
+    var hintServerless = document.getElementById('bluesky-hint-serverless');
+    var hintOauth = document.getElementById('bluesky-hint-oauth');
 
-    fetch(API + '/api/bluesky/me', { credentials: 'include' })
-      .then(function (res) {
-        if (!res.ok) {
+    if (API) {
+      if (hintServerless) hintServerless.classList.add('hidden');
+      if (hintOauth) hintOauth.classList.remove('hidden');
+      if (appPw) appPw.classList.add('hidden');
+      fetch(API + '/api/bluesky/me', { credentials: 'include' })
+        .then(function (res) {
+          if (!res.ok) {
+            connect.classList.remove('hidden');
+            feedWrap.classList.add('hidden');
+            return null;
+          }
+          return res.json();
+        })
+        .then(function (me) {
+          if (!me) return;
+          connect.classList.add('hidden');
+          feedWrap.classList.remove('hidden');
+          userSpan.textContent = 'Connected as @' + (me.handle || me.did);
+          feed.innerHTML = '<p class="muted">Loading your timeline…</p>';
+          return loadBlueskyTimeline(null, false);
+        })
+        .then(function () {})
+        .catch(function (err) {
           connect.classList.remove('hidden');
           feedWrap.classList.add('hidden');
-          return null;
-        }
-        return res.json();
-      })
-      .then(function (me) {
-        if (!me) return;
-        connect.classList.add('hidden');
-        feedWrap.classList.remove('hidden');
-        userSpan.textContent = 'Connected as @' + (me.handle || me.did);
-        feed.innerHTML = '<p class="muted">Loading your timeline…</p>';
-        return loadBlueskyTimeline(null, false);
-      })
-      .then(function () {})
-      .catch(function (err) {
-        connect.classList.remove('hidden');
-        feedWrap.classList.add('hidden');
-        if (err.message !== 'Not connected' && err.message !== 'Failed to fetch') {
-          feed.innerHTML = '<p class="muted">Error: ' + escapeHtml(err.message) + '</p>';
-        }
-      });
+          if (err.message !== 'Not connected' && err.message !== 'Failed to fetch') {
+            feed.innerHTML = '<p class="muted">Error: ' + escapeHtml(err.message) + '</p>';
+          }
+        });
+      return;
+    }
+
+    if (hintServerless) hintServerless.classList.remove('hidden');
+    if (hintOauth) hintOauth.classList.add('hidden');
+    if (appPw) appPw.classList.remove('hidden');
+
+    var session = getStoredSession();
+    if (session && session.accessJwt && session.handle) {
+      connect.classList.add('hidden');
+      feedWrap.classList.remove('hidden');
+      userSpan.textContent = 'Connected as @' + session.handle;
+      feed.innerHTML = '<p class="muted">Loading your timeline…</p>';
+      loadBlueskyTimeline(null, false)
+        .then(function () {})
+        .catch(function (err) {
+          connect.classList.remove('hidden');
+          feedWrap.classList.add('hidden');
+          feed.innerHTML = '<p class="muted">Session expired or error. ' + escapeHtml(err.message) + '</p>';
+        });
+    } else {
+      connect.classList.remove('hidden');
+      feedWrap.classList.add('hidden');
+    }
   }
 
   document.getElementById('bluesky-login-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    const handle = document.getElementById('bluesky-handle').value.trim();
+    var handle = document.getElementById('bluesky-handle').value.trim();
     if (!handle) return;
-    window.location.href = API + '/api/auth/bluesky?handle=' + encodeURIComponent(handle);
+    if (API) {
+      window.location.href = API + '/api/auth/bluesky?handle=' + encodeURIComponent(handle);
+      return;
+    }
+    var appPassword = (document.getElementById('bluesky-app-password') && document.getElementById('bluesky-app-password').value) || '';
+    if (!appPassword) {
+      alert('Enter your app password (create one at bsky.app/settings/app-passwords).');
+      return;
+    }
+    document.getElementById('bluesky-connect').classList.add('hidden');
+    document.getElementById('bluesky-feed-wrap').classList.remove('hidden');
+    document.getElementById('bluesky-feed').innerHTML = '<p class="muted">Connecting…</p>';
+    var feed = document.getElementById('bluesky-feed');
+    resolveHandle(handle)
+      .then(function (did) { return did ? getPdsFromDid(did) : Promise.reject(new Error('Could not resolve handle')); })
+      .then(function (pdsUrl) {
+        return fetch(pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.server.createSession', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: handle, password: appPassword })
+        }).then(function (r) {
+          if (!r.ok) return r.json().then(function (err) { throw new Error(err.message || r.statusText); });
+          return r.json();
+        }).then(function (data) {
+          setStoredSession({
+            accessJwt: data.accessJwt,
+            refreshJwt: data.refreshJwt,
+            handle: data.handle || handle,
+            pdsUrl: pdsUrl
+          });
+          return pdsUrl;
+        });
+      })
+      .then(function () {
+        document.getElementById('bluesky-connect').classList.add('hidden');
+        document.getElementById('bluesky-feed-wrap').classList.remove('hidden');
+        document.getElementById('bluesky-user').textContent = 'Connected as @' + (getStoredSession() && getStoredSession().handle);
+        return loadBlueskyTimeline(null, false);
+      })
+      .then(function () {})
+      .catch(function (err) {
+        document.getElementById('bluesky-connect').classList.remove('hidden');
+        document.getElementById('bluesky-feed-wrap').classList.add('hidden');
+        document.getElementById('bluesky-feed').innerHTML = '<p class="muted">Login failed: ' + escapeHtml(err.message) + '</p>';
+      });
   });
 
   document.getElementById('bluesky-disconnect').addEventListener('click', function () {
-    fetch(API + '/api/auth/bluesky/disconnect', {
-      method: 'POST',
-      credentials: 'include'
-    }).then(function () {
-      document.getElementById('bluesky-connect').classList.remove('hidden');
-      document.getElementById('bluesky-feed-wrap').classList.add('hidden');
-      document.getElementById('bluesky-handle').value = '';
-      initBluesky();
-    });
+    if (API) {
+      fetch(API + '/api/auth/bluesky/disconnect', {
+        method: 'POST',
+        credentials: 'include'
+      }).then(function () {
+        document.getElementById('bluesky-connect').classList.remove('hidden');
+        document.getElementById('bluesky-feed-wrap').classList.add('hidden');
+        document.getElementById('bluesky-handle').value = '';
+        initBluesky();
+      });
+      return;
+    }
+    setStoredSession(null);
+    document.getElementById('bluesky-connect').classList.remove('hidden');
+    document.getElementById('bluesky-feed-wrap').classList.add('hidden');
+    document.getElementById('bluesky-handle').value = '';
+    if (document.getElementById('bluesky-app-password')) document.getElementById('bluesky-app-password').value = '';
+    initBluesky();
   });
 
   document.getElementById('bluesky-load-more').addEventListener('click', function () {
@@ -511,4 +686,5 @@
 
   // Start on home
   showView('home');
-})();
+    })();
+  });

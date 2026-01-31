@@ -130,9 +130,11 @@
       <div id="bluesky-connect" class="bluesky-connect">
         <form id="bluesky-login-form" class="bluesky-login-form">
           <input type="text" id="bluesky-handle" placeholder="you.bsky.social" required />
-          <button type="submit" class="btn btn-primary">Connect with Bluesky</button>
+          <input type="password" id="bluesky-app-password" class="bluesky-app-password hidden" placeholder="App password" autocomplete="off" />
+          <button type="submit" class="btn btn-primary">Connect</button>
         </form>
-        <p class="bluesky-hint">Same OAuth flow as pckt.blog: you’ll sign in on Bluesky and approve access. No app password.</p>
+        <p class="bluesky-hint" id="bluesky-hint-serverless">Use an <a href="https://bsky.app/settings/app-passwords" target="_blank" rel="noopener">app password</a> (no backend needed — works on GitHub Pages).</p>
+        <p class="bluesky-hint hidden" id="bluesky-hint-oauth">With a server (apiBase in config.json): OAuth redirect; otherwise app password above.</p>
       </div>
       <div id="bluesky-feed-wrap" class="bluesky-feed-wrap hidden">
         <div class="bluesky-feed-header">

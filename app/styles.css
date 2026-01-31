@@ -544,6 +544,10 @@ body {
   font-size: 1rem;
 }
 
+.bluesky-app-password.hidden {
+  display: none;
+}
+
 .bluesky-hint {
   font-size: 0.85rem;
   color: var(--text-muted);
@@ -551,6 +555,19 @@ body {
 
 .bluesky-hint a {
   color: var(--accent);
+}
+
+.bluesky-no-server {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+}
+
+.bluesky-no-server code {
+  background: var(--bg);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85em;
 }
 
 .bluesky-feed-header {

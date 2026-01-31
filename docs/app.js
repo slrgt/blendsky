@@ -2,12 +2,17 @@
  * blendsky — wikis, forums & Bluesky feed (timeline from who you follow)
  */
 
-(function () {
-  'use strict';
+fetch('config.json')
+  .then(function (r) { return r.json(); })
+  .catch(function () { return {}; })
+  .then(function (config) {
+    var API = (config && config.apiBase) || '';
 
-  const STORAGE_WIKI = 'blendsky_wiki';
-  const STORAGE_FORUM = 'blendsky_forum';
-  const API = ''; // same origin when served by server
+    (function () {
+      'use strict';
+
+      var STORAGE_WIKI = 'blendsky_wiki';
+      var STORAGE_FORUM = 'blendsky_forum';
 
   // ——— Navigation ———
   const views = document.querySelectorAll('.view');
@@ -481,8 +486,14 @@
 
   document.getElementById('bluesky-login-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    const handle = document.getElementById('bluesky-handle').value.trim();
+    var handle = document.getElementById('bluesky-handle').value.trim();
     if (!handle) return;
+    if (!API) {
+      var hint = document.getElementById('bluesky-no-server-hint');
+      if (hint) hint.classList.remove('hidden');
+      alert('Bluesky login needs the backend server. GitHub Pages cannot run it.\n\nEither run the server locally (see README) or deploy the server elsewhere and set "apiBase" in config.json to your server URL (e.g. https://your-app.railway.app).');
+      return;
+    }
     window.location.href = API + '/api/auth/bluesky?handle=' + encodeURIComponent(handle);
   });
 
@@ -511,4 +522,5 @@
 
   // Start on home
   showView('home');
-})();
+    })();
+  });
