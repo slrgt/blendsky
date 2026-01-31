@@ -114,7 +114,7 @@
       </div>
       <div id="forum-discover" class="forum-discover">
         <h3>Forum posts from the community</h3>
-        <p class="forum-discover-hint muted">Posts from others using the <strong>app.blendsky.document</strong> lexicon (by site origin) and from Bluesky <strong>#blendsky-forum</strong>. Reply on Bluesky; to add a thread locally, paste its AT URI below.</p>
+        <p class="forum-discover-hint muted">Posts from others using the <strong>app.blendsky.document</strong> lexicon and <strong>#blendsky-forum</strong>. Reply in the forum below. To add a thread from someone else, click a card to import and open it, or paste its AT URI below.</p>
         <div id="forum-discover-feed" class="forum-discover-feed"><p class="muted" id="forum-discover-loading">Loading…</p></div>
       </div>
       <h3 class="forum-your-threads-title">Your threads</h3>
@@ -129,9 +129,14 @@
         </div>
         <section class="forum-replies">
           <h3>Replies</h3>
+          <p class="forum-replies-hint muted"><small>Replies stay in the blendsky forum. Add images with the button below.</small></p>
           <ul id="forum-replies-list"></ul>
           <form id="forum-reply-form" class="forum-reply-form">
             <textarea id="forum-reply-body" placeholder="Write a reply…" rows="3"></textarea>
+            <p class="form-actions-inline">
+              <input type="file" id="forum-reply-image" accept="image/jpeg,image/png,image/gif,image/webp" class="forum-image-input" />
+              <label for="forum-reply-image" class="btn btn-secondary forum-upload-label">Add image</label>
+            </p>
             <button type="submit" class="btn btn-primary">Reply</button>
           </form>
         </section>
