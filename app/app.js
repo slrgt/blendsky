@@ -527,10 +527,12 @@ fetch('config.json')
       var createdBy = page.createdBy || 'Local';
       var updatedBy = page.updatedBy || page.createdBy || 'Local';
       var updatedAt = page.updatedAt || page.createdAt;
-      var parts = ['By ' + escapeHtml(createdBy)];
+      var version = page.version != null ? page.version : 0.1;
+      var versionStr = typeof version === 'number' ? version.toFixed(1) : String(version);
+      var parts = ['Author: ' + escapeHtml(createdBy), 'Version ' + versionStr];
       if (updatedAt) parts.push('Last edited by ' + escapeHtml(updatedBy) + ' at ' + new Date(updatedAt).toLocaleString());
       bylineEl.textContent = parts.join(' · ');
-      bylineEl.style.display = parts.length ? 'block' : 'none';
+      bylineEl.style.display = 'block';
     }
     document.getElementById('wiki-view').classList.remove('hidden');
     document.getElementById('wiki-edit').classList.add('hidden');
@@ -766,7 +768,12 @@ fetch('config.json')
     var session = getStoredSession();
     var by = (session && session.handle) ? '@' + session.handle : 'Local';
     var now = new Date().toISOString();
-    pages[newSlug] = { title: title, body: body, updatedBy: by, updatedAt: now };
+    var nextVersion = 0.1;
+    if (existing) {
+      var prevVersion = typeof existing.version === 'number' ? existing.version : (parseFloat(existing.version, 10) || 0.1);
+      nextVersion = Math.round((prevVersion + 0.1) * 10) / 10;
+    }
+    pages[newSlug] = { title: title, body: body, updatedBy: by, updatedAt: now, version: nextVersion };
     if (existing) {
       if (existing.atUri) pages[newSlug].atUri = existing.atUri;
       if (existing.remixedFrom) pages[newSlug].remixedFrom = existing.remixedFrom;
@@ -864,7 +871,7 @@ fetch('config.json')
     var newSlug = slugify(newTitle);
     var body = page.body || '';
     if (page.atUri) body = 'Remixed from: ' + page.atUri + '\n\n' + body;
-    var newPage = { title: newTitle, body: body, replies: [] };
+    var newPage = { title: newTitle, body: body, version: 0.1, replies: [] };
     if (page.atUri) newPage.remixedFrom = page.atUri;
     pages[newSlug] = newPage;
     setWikiPages(pages);
@@ -1676,6 +1683,7 @@ fetch('config.json')
         body: imported.body || '',
         atUri: uri,
         createdBy: imported.createdBy || author || 'AT Protocol',
+        version: 0.1,
         replies: []
       };
       setWikiPages(pages);
