@@ -1115,6 +1115,51 @@ fetch('config.json')
     });
   }
 
+  /** Remix: fetch document by AT URI, create a new thread with the content (and "Remixed from" line), open in edit mode so user can adapt and sync. Returns Promise. */
+  function doRemixFromUri(uri) {
+    var req = API
+      ? fetch(API + '/api/at/record?uri=' + encodeURIComponent(uri), { credentials: 'include' }).then(function (res) { return res.ok ? res.json() : Promise.reject(new Error(res.statusText)); })
+      : fetchAtRecord(uri);
+    return req.then(function (data) {
+      if (typeof BlendskyLexicon === 'undefined') throw new Error('BlendskyLexicon not loaded');
+      var record = data.value || data.record || data;
+      var author = data.handle || (data.repo && data.repo.indexOf('did:') === 0 ? 'AT' : '');
+      var imported = BlendskyLexicon.recordToThread(record, uri, author);
+      if (!imported) throw new Error('Could not parse document');
+      var fd = getForumData();
+      var newId = fd.nextId++;
+      var now = new Date().toISOString();
+      var body = 'Remixed from: ' + uri + '\n\n' + (imported.body || '');
+      var pathSeg = (imported.path || '').replace(/^forum\/?/, '');
+      var newThread = {
+        id: newId,
+        title: (imported.title || 'Untitled') + ' (remix)',
+        body: body,
+        description: imported.description || '',
+        path: pathSeg ? pathSeg + '-remix' : undefined,
+        tags: imported.tags,
+        publishedAt: now,
+        updatedAt: now,
+        author: 'You',
+        replies: [],
+        remixedFrom: uri
+      };
+      fd.threads.push(newThread);
+      setForumData(fd);
+      renderThreadList();
+      document.getElementById('forum-thread-list').classList.remove('hidden');
+      document.getElementById('forum-thread-view').classList.add('hidden');
+      document.getElementById('forum-new-view').classList.add('hidden');
+      document.getElementById('forum-edit-view').classList.remove('hidden');
+      document.getElementById('forum-edit-view').dataset.editingThreadId = String(newId);
+      document.getElementById('forum-edit-title').value = newThread.title;
+      document.getElementById('forum-edit-path').value = newThread.path || '';
+      document.getElementById('forum-edit-description').value = newThread.description || '';
+      document.getElementById('forum-edit-body').value = newThread.body || '';
+      document.getElementById('forum-edit-tags').value = (newThread.tags && newThread.tags.length) ? newThread.tags.join(', ') : '';
+    });
+  }
+
   document.getElementById('forum-import-btn').addEventListener('click', function () {
     var uriInput = document.getElementById('forum-import-uri');
     var raw = (uriInput && uriInput.value && uriInput.value.trim()) || '';
@@ -1209,7 +1254,7 @@ fetch('config.json')
             : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
           parts.push(
             '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '">' +
-              '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to import this document">' +
+              '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to open this thread">' +
                 '<div class="forum-discover-byline">' +
                   avatarHtml +
                   '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
@@ -1221,6 +1266,9 @@ fetch('config.json')
                 (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
                 '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
                 '<span class="forum-discover-lexicon-tag">site.standard.document</span>' +
+              '</p>' +
+              '<p class="forum-discover-actions">' +
+                '<button type="button" class="btn btn-ghost btn-sm forum-discover-remix-btn" title="Copy into a new thread and edit (remix tutorial)">Remix</button>' +
               '</p>' +
             '</div>'
           );
@@ -1283,6 +1331,25 @@ fetch('config.json')
               wrapEl.classList.remove('forum-discover-loading');
               a.removeAttribute('aria-busy');
               alert('Import failed: ' + (err.message || 'unknown'));
+            });
+          });
+        });
+        wrap.querySelectorAll('.forum-discover-remix-btn').forEach(function (btn) {
+          var wrapEl = btn.closest('.forum-discover-card-wrap');
+          var uri = wrapEl && wrapEl.getAttribute('data-lexicon-uri');
+          if (!uri) return;
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            wrapEl.classList.add('forum-discover-loading');
+            btn.setAttribute('aria-busy', 'true');
+            doRemixFromUri(uri).then(function () {
+              wrapEl.classList.remove('forum-discover-loading');
+              btn.removeAttribute('aria-busy');
+            }).catch(function (err) {
+              wrapEl.classList.remove('forum-discover-loading');
+              btn.removeAttribute('aria-busy');
+              alert('Remix failed: ' + (err.message || 'unknown'));
             });
           });
         });
