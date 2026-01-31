@@ -414,12 +414,13 @@ fetch('config.json')
     var wrap = document.getElementById('wiki-from-others-feed');
     var loading = document.getElementById('wiki-from-others-loading');
     if (!wrap || !loading) return;
-    // Lexicon-based discovery: app.blendsky.document with .app = 'blendsky', kind = 'wiki' (no hashtag required)
-    fetchConstellationLinks('blendsky', 'app.blendsky.document', '.app', 40).then(function (links) {
+    // Discovery: site.standard.document (Standard.site). Constellation may use .path; fallback to Bluesky search (#blendsky-wiki).
+    fetchConstellationLinks(window.location.origin, 'site.standard.document', '.path', 40).then(function (links) {
       return Promise.all(links.slice(0, 25).map(function (l) {
         return fetchAtRecord(l.uri).then(function (data) {
           var record = data.value || data.record;
-          if (!record || (record.kind && record.kind !== 'wiki')) return null;
+          var path = (record && record.path) ? String(record.path) : '';
+          if (!record || path.indexOf('/wiki/') !== 0) return null;
           var title = (record && record.title) || 'Untitled';
           var content = (record && (record.content || record.textContent)) || '';
           var snippet = String(content).replace(/\n/g, ' ').slice(0, 140);
@@ -430,7 +431,7 @@ fetch('config.json')
     }).then(function (wikiCards) {
       loading.classList.add('hidden');
       if (wikiCards.length === 0) {
-        wrap.innerHTML = '<p class="muted">No wiki articles from others yet. Sync a page to Bluesky (uses app.blendsky.document). No hashtag required.</p>';
+        wrap.innerHTML = '<p class="muted">No wiki articles from others yet. Sync a page to Bluesky (uses Standard.site <code>site.standard.document</code>).</p>';
         return;
       }
       var profilePromises = wikiCards.map(function (c) { return getProfileByDid(c.did).then(function (p) { c.profile = p; return c; }); });
@@ -471,7 +472,7 @@ fetch('config.json')
       });
     }).catch(function () {
       loading.classList.add('hidden');
-      wrap.innerHTML = '<p class="muted">Could not load wiki articles. Sync a page to Bluesky (app.blendsky.document). No hashtag required.</p>';
+      wrap.innerHTML = '<p class="muted">Could not load wiki articles. Sync a page to Bluesky (Standard.site <code>site.standard.document</code>).</p>';
     });
   }
 
@@ -1068,7 +1069,7 @@ fetch('config.json')
         var handle = handlePart.indexOf('.') !== -1 ? handlePart : handlePart + '.bsky.social';
         return resolveHandle(handle).then(function (did) {
           if (!did) return Promise.reject(new Error('Could not resolve handle: ' + handle));
-          var ns = typeof BlendskyLexicon !== 'undefined' ? BlendskyLexicon.NS_DOCUMENT : 'app.blendsky.document';
+          var ns = typeof BlendskyLexicon !== 'undefined' ? BlendskyLexicon.NS_DOCUMENT : 'site.standard.document';
           var rkeysToTry = [pathPart];
           var lastSegment = pathPart.lastIndexOf('-') !== -1 ? pathPart.slice(pathPart.lastIndexOf('-') + 1) : pathPart;
           if (lastSegment && lastSegment !== pathPart) rkeysToTry.push(lastSegment);
@@ -1118,7 +1119,7 @@ fetch('config.json')
     var uriInput = document.getElementById('forum-import-uri');
     var raw = (uriInput && uriInput.value && uriInput.value.trim()) || '';
     if (!raw) {
-      alert('Enter an AT URI (at://did:plc:…/app.blendsky.document/…) or a /b/handle/slug URL.');
+      alert('Enter an AT URI (at://did:plc:…/site.standard.document/…) or a /b/handle/slug URL.');
       return;
     }
     var atUriPromise = (raw.indexOf('at://') === 0)
@@ -1133,9 +1134,9 @@ fetch('config.json')
     });
   });
 
-  /** Fetch DIDs that link to target (e.g. app.blendsky.document records whose .site = origin). Returns Promise<{ uri, did }[]>. */
+  /** Fetch DIDs that link to target (e.g. site.standard.document records). Returns Promise<{ uri, did }[]>. */
   function fetchConstellationLinks(targetOrigin, collection, path, limit) {
-    var url = CONSTELLATION_BASE + '/links?target=' + encodeURIComponent(targetOrigin) + '&collection=' + encodeURIComponent(collection || 'app.blendsky.document') + '&path=' + encodeURIComponent(path || '.site') + '&limit=' + (limit || 30);
+    var url = CONSTELLATION_BASE + '/links?target=' + encodeURIComponent(targetOrigin) + '&collection=' + encodeURIComponent(collection || 'site.standard.document') + '&path=' + encodeURIComponent(path || '.path') + '&limit=' + (limit || 30);
     return fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'blendsky/1.0' } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -1161,12 +1162,13 @@ fetch('config.json')
     if (!wrap) return;
     wrap.innerHTML = '<p class="muted" id="forum-discover-loading">Loading…</p>';
     var loading = document.getElementById('forum-discover-loading');
-    // Lexicon-based discovery: all app.blendsky.document records with .app = 'blendsky' (no hashtag required)
-    var lexiconPromise = fetchConstellationLinks('blendsky', 'app.blendsky.document', '.app', 50).then(function (links) {
+    // Discovery: site.standard.document (Standard.site). Constellation may use .path.
+    var lexiconPromise = fetchConstellationLinks(window.location.origin, 'site.standard.document', '.path', 50).then(function (links) {
       return Promise.all(links.slice(0, 30).map(function (l) {
         return fetchAtRecord(l.uri).then(function (data) {
           var record = data.value || data.record;
-          if (!record || (record.kind && record.kind !== 'forum')) return null;
+          var path = (record && record.path) ? String(record.path) : '';
+          if (!record || path.indexOf('/forum/') !== 0) return null;
           var title = (record && record.title) || 'Untitled';
           var content = (record && (record.content || record.textContent)) || '';
           var snippet = String(content).replace(/\n/g, ' ').slice(0, 160);
@@ -1195,7 +1197,7 @@ fetch('config.json')
       var profilePromises = lexiconCards.map(function (c) { return getProfileByDid(c.did).then(function (p) { c.profile = p; return c; }); });
       Promise.all(profilePromises).then(function () {
         var parts = [];
-        // Lexicon cards first (shared app.blendsky.document, no hashtag required)
+        // Lexicon cards first (Standard.site site.standard.document)
         lexiconCards.forEach(function (c) {
           var profile = c.profile || {};
           var handle = profile.handle || c.did || '?';
@@ -1218,7 +1220,7 @@ fetch('config.json')
               '<p class="forum-discover-author-meta">' +
                 (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
                 '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
-                '<span class="forum-discover-lexicon-tag">app.blendsky.document</span>' +
+                '<span class="forum-discover-lexicon-tag">site.standard.document</span>' +
               '</p>' +
             '</div>'
           );
@@ -1259,7 +1261,7 @@ fetch('config.json')
             ? 'Connect your Bluesky account to see forum posts from other users. Use <strong>Log in</strong> (top right), then click <strong>Refresh</strong> below to load community posts.'
             : needLogin
               ? 'Connect your Bluesky account (Log in, top right) to see forum posts from other users. After connecting, click Refresh below.'
-              : 'No forum posts from others yet. Sync your thread to Bluesky (uses app.blendsky.document). No hashtag required. Or paste an AT URI below to import a thread.';
+              : 'No forum posts from others yet. Sync your thread to Bluesky (Standard.site <code>site.standard.document</code>). Or paste an AT URI below to import a thread.';
           wrap.innerHTML = '<p class="muted forum-discover-empty">' + msg + '</p><p class="forum-discover-refresh-wrap"><button type="button" class="btn btn-ghost forum-discover-refresh" id="forum-discover-refresh">Refresh community posts</button></p>';
           var refreshBtn = wrap.querySelector('#forum-discover-refresh');
           if (refreshBtn) refreshBtn.addEventListener('click', function () { loadForumDiscover(); });
@@ -1347,94 +1349,132 @@ fetch('config.json')
     });
   }
 
+  /** Refresh session using refreshJwt. Updates stored session; returns Promise<session>. */
+  function refreshSession() {
+    var session = getStoredSession();
+    if (!session || !session.refreshJwt || !session.pdsUrl) return Promise.reject(new Error('No refresh token. Please log in again.'));
+    var url = session.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.server.refreshSession';
+    return fetch(url, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + session.refreshJwt }
+    }).then(function (res) {
+      if (!res.ok) return res.json().then(function (err) { throw new Error(err.message || err.error || res.statusText); }).catch(function (e) { if (e instanceof Error && e.message) throw e; throw new Error(res.status + ' ' + res.statusText); });
+      return res.json();
+    }).then(function (data) {
+      var newSession = {
+        accessJwt: data.accessJwt,
+        refreshJwt: data.refreshJwt,
+        handle: data.handle || session.handle,
+        did: data.did || session.did,
+        pdsUrl: session.pdsUrl
+      };
+      setStoredSession(newSession);
+      return newSession;
+    });
+  }
+
   var BSKY_POST_MAX = 300;
 
-  /** Put a record (with rkey) into the logged-in user's Bluesky repo. */
+  /** Put a record (with rkey) into the logged-in user's Bluesky repo. Refreshes session on 401/ExpiredToken and retries once. */
   function putRecordToBluesky(collection, rkey, record) {
     var session = getStoredSession();
     if (!session || !session.accessJwt || !session.pdsUrl) return Promise.reject(new Error('Not connected to Bluesky'));
-    return ensureSessionDid(session).then(function (s) {
+    function doPut(s) {
       var url = s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.repo.putRecord';
       return fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + s.accessJwt
-        },
-        body: JSON.stringify({
-          repo: s.did,
-          collection: collection,
-          rkey: rkey,
-          record: record
-        })
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.accessJwt },
+        body: JSON.stringify({ repo: s.did, collection: collection, rkey: rkey, record: record })
       }).then(function (res) {
         if (!res.ok) {
           return res.json().then(function (err) {
             var msg = (err && (err.message || err.error)) || res.statusText;
             if (err && err.error) msg = (err.error + (err.message ? ': ' + err.message : ''));
-            throw new Error(msg);
+            var e = new Error(msg);
+            if (res.status === 401 || (err && (err.error === 'ExpiredToken' || (err.message && err.message.indexOf('expired') !== -1)))) e._expired = true;
+            throw e;
           }).catch(function (parseErr) {
+            if (parseErr._expired) throw parseErr;
             if (parseErr instanceof Error && parseErr.message && parseErr.message.indexOf('Unexpected') === -1) throw parseErr;
             throw new Error(res.status + ' ' + res.statusText);
           });
         }
         return res.json();
       });
+    }
+    return ensureSessionDid(session).then(function (s) {
+      return doPut(s).catch(function (err) {
+        if ((err && err._expired) || (err && (err.message && (err.message.indexOf('ExpiredToken') !== -1 || err.message.indexOf('expired') !== -1)))) {
+          return refreshSession().then(function (newS) { return doPut(newS); });
+        }
+        throw err;
+      });
     });
   }
 
-  /** Upload an image blob to the user's repo. Returns a URL that can be embedded in content (getBlob). */
+  /** Upload an image blob to the user's repo. Returns a URL that can be embedded in content (getBlob). Refreshes session on 401/ExpiredToken and retries once. */
   function uploadBlobToBluesky(file) {
     var session = getStoredSession();
     if (!session || !session.accessJwt || !session.pdsUrl) return Promise.reject(new Error('Not connected to Bluesky'));
-    return ensureSessionDid(session).then(function (s) {
+    function doUpload(s) {
       var url = s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.repo.uploadBlob';
       return fetch(url, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + s.accessJwt, 'Content-Type': file.type || 'image/jpeg' },
         body: file
       }).then(function (res) {
-        if (!res.ok) return res.json().then(function (err) { throw new Error(err.message || err.error || res.statusText); });
+        if (!res.ok) return res.json().then(function (err) { throw new Error(err.message || err.error || res.statusText); }).catch(function (e) { throw new Error(res.status + ' ' + res.statusText); });
         return res.json();
       }).then(function (data) {
         var ref = (data && data.blob && data.blob.ref) ? data.blob.ref : data.ref;
         var cid = (ref && ref.$link) ? ref.$link : (ref && ref.cid) ? ref.cid : null;
         if (!cid) throw new Error('No blob ref returned');
-        var blobUrl = s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.sync.getBlob?did=' + encodeURIComponent(s.did) + '&cid=' + encodeURIComponent(cid);
-        return blobUrl;
+        return s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.sync.getBlob?did=' + encodeURIComponent(s.did) + '&cid=' + encodeURIComponent(cid);
+      });
+    }
+    return ensureSessionDid(session).then(function (s) {
+      return doUpload(s).catch(function (err) {
+        if (err && (err.message && (err.message.indexOf('ExpiredToken') !== -1 || err.message.indexOf('expired') !== -1))) {
+          return refreshSession().then(function (newS) { return doUpload(newS); });
+        }
+        throw err;
       });
     });
   }
 
-  /** Create a record (rkey auto-generated) in the logged-in user's Bluesky repo. Returns { uri, cid }. */
+  /** Create a record (rkey auto-generated) in the logged-in user's Bluesky repo. Returns { uri, cid }. Refreshes session on 401/ExpiredToken and retries once. */
   function createRecordToBluesky(collection, record) {
     var session = getStoredSession();
     if (!session || !session.accessJwt || !session.pdsUrl) return Promise.reject(new Error('Not connected to Bluesky'));
-    return ensureSessionDid(session).then(function (s) {
+    function doCreate(s) {
       var url = s.pdsUrl.replace(/\/$/, '') + '/xrpc/com.atproto.repo.createRecord';
       return fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + s.accessJwt
-        },
-        body: JSON.stringify({
-          repo: s.did,
-          collection: collection,
-          record: record
-        })
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.accessJwt },
+        body: JSON.stringify({ repo: s.did, collection: collection, record: record })
       }).then(function (res) {
         if (!res.ok) {
           return res.json().then(function (err) {
             var msg = (err && (err.message || err.error)) || res.statusText;
             if (err && err.error) msg = (err.error + (err.message ? ': ' + err.message : ''));
-            throw new Error(msg);
+            var e = new Error(msg);
+            if (res.status === 401 || (err && (err.error === 'ExpiredToken' || (err.message && err.message.indexOf('expired') !== -1)))) e._expired = true;
+            throw e;
           }).catch(function (parseErr) {
+            if (parseErr._expired) throw parseErr;
             if (parseErr instanceof Error && parseErr.message && parseErr.message.indexOf('Unexpected') === -1) throw parseErr;
             throw new Error(res.status + ' ' + res.statusText);
           });
         }
         return res.json();
+      });
+    }
+    return ensureSessionDid(session).then(function (s) {
+      return doCreate(s).catch(function (err) {
+        if ((err && err._expired) || (err && err.message && (err.message.indexOf('ExpiredToken') !== -1 || err.message.indexOf('expired') !== -1))) {
+          return refreshSession().then(function (newS) { return doCreate(newS); });
+        }
+        throw err;
       });
     });
   }
@@ -1558,7 +1598,7 @@ fetch('config.json')
   var syncingWikiSlug = null;
   var syncingForumId = null;
 
-  /** Full sync: put app.blendsky.document + post feed (single or thread). Updates page.atUri. If document put fails, still posts feed so others can find via #blendsky-wiki. */
+  /** Full sync: put site.standard.document (Standard.site) + post feed. Updates page.atUri. Refreshes token if expired; if document put fails, still posts feed so others find via #blendsky-wiki. */
   function doSyncWikiPage(slug) {
     var pages = getWikiPages();
     var page = pages[slug];
@@ -1595,7 +1635,7 @@ fetch('config.json')
       .then(function () { syncingWikiSlug = null; }, function (e) { syncingWikiSlug = null; throw e; });
   }
 
-  /** Full sync: put app.blendsky.document + post feed (single or thread). Updates thread.atUri. If document put fails, still posts feed so others can find via #blendsky-forum. */
+  /** Full sync: put site.standard.document (Standard.site) + post feed. Updates thread.atUri. Refreshes token if expired; if document put fails, still posts feed so others find via #blendsky-forum. */
   function doSyncForumThread(threadId) {
     var data = getForumData();
     var thread = data.threads.find(function (t) { return t.id === threadId; });

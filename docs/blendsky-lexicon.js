@@ -1,62 +1,47 @@
 /**
- * blendsky lexicon — one document type for forum posts and wiki articles on the AT Protocol.
- * NSID: app.blendsky.document
- * Used for forums and wikis published from this app; discoverable by collection on the AT Protocol.
+ * blendsky — wiki and forum as Standard.site documents (https://standard.site).
+ * Uses site.standard.document so forum and wiki posts work like blog posts:
+ * path, title, content. Discovery and portability via Standard.site.
  */
 
 (function (global) {
   'use strict';
 
-  const NS_DOCUMENT = 'app.blendsky.document';
+  const NS_DOCUMENT = 'site.standard.document';
 
-  /** app.blendsky.document record shape for a wiki page. kind: 'wiki'. */
+  /** site.standard.document record for a wiki page. path: /wiki/slug */
   function documentFromWikiPage(page, slug, baseUrl) {
-    const now = new Date().toISOString();
-    const body = page.body || '';
-    const doc = {
+    var path = '/wiki/' + (slug || 'untitled').replace(/^\//, '').replace(/^wiki\/?/, '');
+    if (path === '/wiki/') path = '/wiki/untitled';
+    return {
       $type: NS_DOCUMENT,
-      kind: 'wiki',
-      app: 'blendsky',
-      site: baseUrl || (typeof location !== 'undefined' ? location.origin : ''),
-      path: '/' + (slug || 'untitled').replace(/^\//, ''),
+      path: path,
       title: page.title || 'Untitled',
-      description: '',
-      textContent: body.replace(/\n/g, ' ').slice(0, 300),
-      tags: [],
-      publishedAt: page.publishedAt || now,
-      updatedAt: page.updatedAt || now,
-      content: body
+      content: page.body || ''
     };
-    if (page.remixedFrom) doc.forkOf = page.remixedFrom;
-    return doc;
   }
 
-  /** app.blendsky.document record shape for a forum thread. kind: 'forum'. */
+  /** site.standard.document record for a forum thread. path: /forum/threadPath */
   function documentFromThread(thread, baseUrl) {
-    const now = new Date().toISOString();
+    var pathSeg = (thread.path && thread.path.replace(/^\//, '')) || ('thread-' + thread.id);
+    var path = '/forum/' + pathSeg;
+    var content = (thread.description ? thread.description + '\n\n' : '') + (thread.body || '');
     return {
       $type: NS_DOCUMENT,
-      kind: 'forum',
-      app: 'blendsky',
-      site: baseUrl || (typeof location !== 'undefined' ? location.origin : ''),
-      path: thread.path ? '/' + thread.path.replace(/^\//, '') : '/thread/' + thread.id,
+      path: path,
       title: thread.title || 'Untitled',
-      description: thread.description || '',
-      textContent: thread.textContent || (thread.body || '').replace(/\n/g, ' ').slice(0, 300),
-      tags: Array.isArray(thread.tags) ? thread.tags : [],
-      publishedAt: thread.publishedAt || thread.createdAt || now,
-      updatedAt: thread.updatedAt || thread.publishedAt || thread.createdAt || now,
-      content: thread.body || '',
-      bskyPostRef: thread.bskyPostRef || undefined
+      content: content.trim() || '(No content)'
     };
   }
 
-  /** Normalize forum thread to full document shape (for export). */
+  /** Normalize forum thread to document shape (for export). */
   function threadToDocumentShape(thread, baseUrl) {
-    const doc = documentFromThread(thread, baseUrl);
+    var doc = documentFromThread(thread, baseUrl);
     return {
       $type: NS_DOCUMENT,
-      ...doc,
+      path: doc.path,
+      title: doc.title,
+      content: doc.content,
       id: thread.id,
       author: thread.author,
       replies: thread.replies
@@ -65,7 +50,7 @@
 
   /** Parse AT URI into repo, collection, rkey */
   function parseAtUri(uri) {
-    const m = /^at:\/\/([^/]+)\/([^/]+)\/(.+)$/.exec(uri);
+    var m = /^at:\/\/([^/]+)\/([^/]+)\/(.+)$/.exec(uri);
     return m ? { repo: m[1], collection: m[2], rkey: m[3] } : null;
   }
 
@@ -74,20 +59,20 @@
     return 'at://' + repo + '/' + collection + '/' + rkey;
   }
 
-  /** Convert fetched AT record (app.blendsky.document) into a forum thread for display */
+  /** Convert fetched site.standard.document (or legacy app.blendsky.document) into a forum thread for display */
   function recordToThread(record, uri, author) {
     if (!record || typeof record !== 'object') return null;
-    const title = record.title || 'Untitled';
-    const body = record.content || record.textContent || '';
-    const path = (record.path && record.path.replace(/^\//, '')) || '';
+    var title = record.title || 'Untitled';
+    var body = record.content || record.textContent || '';
+    var path = (record.path && record.path.replace(/^\//, '')) || '';
     return {
       id: 'at-' + (record.tid || record.path || uri).replace(/[^a-zA-Z0-9-]/g, '-'),
       atUri: uri,
       title: title,
       description: record.description || '',
       body: body,
-      textContent: record.textContent || '',
-      path: path,
+      textContent: record.textContent || body,
+      path: path.replace(/^forum\/?/, '').replace(/^wiki\/?/, ''),
       tags: Array.isArray(record.tags) ? record.tags : [],
       publishedAt: record.publishedAt || '',
       updatedAt: record.updatedAt || '',
