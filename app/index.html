@@ -132,7 +132,7 @@
       </div>
       <div id="forum-discover" class="forum-discover">
         <h3>Forum posts from the community</h3>
-        <p class="forum-discover-hint muted">Previous posts people have made using the forum (synced from Bluesky <strong>#blendsky-forum</strong>). Reply on Bluesky; to add a thread locally, paste its AT URI or pckt.blog URL below.</p>
+        <p class="forum-discover-hint muted">Posts from others using the shared lexicon <strong>site.standard.document</strong> (by site origin) and from Bluesky <strong>#blendsky-forum</strong>. Reply on Bluesky; to add a thread locally, paste its AT URI or pckt.blog URL below.</p>
         <div id="forum-discover-feed" class="forum-discover-feed"><p class="muted" id="forum-discover-loading">Loading…</p></div>
       </div>
       <h3 class="forum-your-threads-title">Your threads</h3>
@@ -160,7 +160,11 @@
           <label class="form-label">Title</label>
           <input type="text" id="forum-new-title" class="form-input" placeholder="What's this thread about?" required />
           <label class="form-label">Your post</label>
-          <textarea id="forum-new-body" class="form-input form-textarea" placeholder="What's on your mind? You can paste a geometry node JSON here if you have one." rows="5"></textarea>
+          <textarea id="forum-new-body" class="form-input form-textarea" placeholder="What's on your mind? You can paste a geometry node JSON or add images." rows="5"></textarea>
+          <p class="form-actions-inline">
+            <input type="file" id="forum-new-image" accept="image/jpeg,image/png,image/gif,image/webp" class="forum-image-input" />
+            <label for="forum-new-image" class="btn btn-secondary forum-upload-label">Add image</label>
+          </p>
           <p class="form-hint muted">This will appear on the forum. Sync to Bluesky to share it there.</p>
           <details class="form-optional">
             <summary>Optional</summary>
@@ -181,6 +185,10 @@
           <input type="text" id="forum-edit-title" class="form-input" placeholder="Thread title" required />
           <label class="form-label">Your post</label>
           <textarea id="forum-edit-body" class="form-input form-textarea" placeholder="Your post or geometry node JSON" rows="5"></textarea>
+          <p class="form-actions-inline">
+            <input type="file" id="forum-edit-image" accept="image/jpeg,image/png,image/gif,image/webp" class="forum-image-input" />
+            <label for="forum-edit-image" class="btn btn-secondary forum-upload-label">Add image</label>
+          </p>
           <details class="form-optional">
             <summary>Optional</summary>
             <input type="text" id="forum-edit-path" class="form-input form-input-optional" placeholder="Link name" />
