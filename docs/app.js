@@ -37,7 +37,10 @@ fetch('config.json')
     });
     navLinks.forEach(function (a) {
       const linkNav = a.getAttribute('data-nav');
-      a.classList.toggle('active', linkNav === id);
+      var isActive = linkNav === id;
+      a.classList.toggle('active', isActive);
+      if (isActive) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
     });
     if (id === 'wiki') initWiki();
     if (id === 'forum') initForum();
@@ -1298,6 +1301,37 @@ fetch('config.json')
     }
   }
 
+  /** Open on-site viewer for a community feed post (so users stay on the site, not Bluesky). */
+  function openPostViewer(data) {
+    var overlay = document.getElementById('post-viewer-overlay');
+    var titleEl = document.getElementById('post-viewer-title');
+    var bylineEl = overlay && overlay.querySelector('.post-viewer-byline');
+    var bodyEl = document.getElementById('post-viewer-body');
+    var linkEl = document.getElementById('post-viewer-bsky-link');
+    if (!overlay || !titleEl || !bodyEl || !linkEl) return;
+    var text = (data && data.fullText) ? String(data.fullText) : '';
+    var firstLine = text.split('\n')[0] || text;
+    var title = firstLine.length > 80 ? firstLine.slice(0, 77) + '…' : firstLine || 'Thread';
+    var handle = (data && data.handle) ? data.handle : '?';
+    var displayName = (data && data.displayName) ? data.displayName : handle;
+    titleEl.textContent = title;
+    if (bylineEl) bylineEl.textContent = 'By @' + (displayName || handle);
+    bodyEl.innerHTML = simpleMarkdown(text);
+    linkEl.href = (data && data.postUri) ? data.postUri : '#';
+    linkEl.classList.toggle('hidden', !(data && data.postUri));
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+    var closeBtn = document.getElementById('post-viewer-close');
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function closePostViewer() {
+    var overlay = document.getElementById('post-viewer-overlay');
+    if (!overlay) return;
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
   /** Import a document by AT URI and open it in the forum (or open existing if already imported). Returns Promise. */
   function doImportAndOpen(uri) {
     var forumData = getForumData();
@@ -1486,6 +1520,7 @@ fetch('config.json')
         feedCards.forEach(function (c) { items.push({ sortAt: c.sortAt, _type: 'feed', c: c }); });
         items.sort(function (a, b) { return (b.sortAt || 0) - (a.sortAt || 0); });
         var parts = [];
+        var feedCardData = [];
         items.forEach(function (item) {
           if (item._type === 'lexicon') {
             var c = item.c;
@@ -1527,12 +1562,15 @@ fetch('config.json')
             var avatarUrl = author.avatar || '';
             var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : ('https://bsky.app/profile/' + (did || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
             var profileUrl = bskyProfileUrl(author);
+            var fullText = (p.record && p.record.text) ? String(p.record.text) : '';
+            var feedIdx = feedCardData.length;
+            feedCardData.push({ postUri: postUri, handle: handle, displayName: displayName, fullText: fullText });
             var avatarHtml = avatarUrl
               ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
               : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
             parts.push(
-              '<div class="forum-discover-card-wrap">' +
-                '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="forum-discover-card">' +
+              '<div class="forum-discover-card-wrap" data-feed-index="' + feedIdx + '">' +
+                '<a href="#" class="forum-discover-card forum-discover-card-feed" title="Open on site">' +
                   '<div class="forum-discover-byline">' +
                     avatarHtml +
                     '<span class="forum-discover-name">' + escapeHtml(displayName) + '</span>' +
@@ -1601,6 +1639,17 @@ fetch('config.json')
             });
           });
         });
+        wrap.querySelectorAll('.forum-discover-card-feed').forEach(function (a) {
+          var wrapEl = a.closest('.forum-discover-card-wrap');
+          var idxStr = wrapEl && wrapEl.getAttribute('data-feed-index');
+          if (idxStr == null) return;
+          var data = feedCardData[parseInt(idxStr, 10)];
+          if (!data) return;
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            openPostViewer(data);
+          });
+        });
       });
     }).catch(function () {
       loading.classList.add('hidden');
@@ -1623,6 +1672,11 @@ fetch('config.json')
 
   var homeRecentRefreshBtn = document.getElementById('home-recent-refresh');
   if (homeRecentRefreshBtn) homeRecentRefreshBtn.addEventListener('click', function () { loadHomeRecent(); });
+
+  var postViewerClose = document.getElementById('post-viewer-close');
+  if (postViewerClose) postViewerClose.addEventListener('click', closePostViewer);
+  var postViewerBackdrop = document.getElementById('post-viewer-backdrop');
+  if (postViewerBackdrop) postViewerBackdrop.addEventListener('click', closePostViewer);
 
   // ——— Bluesky (serverless: app password + PDS, or server: OAuth) ———
   function getStoredSession() {

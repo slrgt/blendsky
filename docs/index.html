@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="blendsky" />
   <title>blendsky — Forum for Blender users sharing JSON geometry node setups</title>
+  <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet" />
@@ -246,6 +251,40 @@
       </div>
     </section>
   </main>
+
+  <nav class="bottom-nav" aria-label="Main">
+    <a href="#" class="bottom-nav-link" data-nav="home">
+      <span class="bottom-nav-icon" aria-hidden="true">⌂</span>
+      <span class="bottom-nav-label">Home</span>
+    </a>
+    <a href="#" class="bottom-nav-link" data-nav="wiki">
+      <span class="bottom-nav-icon" aria-hidden="true">📖</span>
+      <span class="bottom-nav-label">Wiki</span>
+    </a>
+    <a href="#" class="bottom-nav-link" data-nav="forum">
+      <span class="bottom-nav-icon" aria-hidden="true">💬</span>
+      <span class="bottom-nav-label">Forum</span>
+    </a>
+    <a href="#" class="bottom-nav-link" data-nav="bluesky">
+      <span class="bottom-nav-icon" aria-hidden="true">☁</span>
+      <span class="bottom-nav-label">Bluesky</span>
+    </a>
+  </nav>
+
+  <div id="post-viewer-overlay" class="post-viewer-overlay hidden" aria-hidden="true">
+    <div class="post-viewer-backdrop" id="post-viewer-backdrop"></div>
+    <div class="post-viewer-sheet" id="post-viewer-sheet" role="dialog" aria-labelledby="post-viewer-title" aria-modal="true">
+      <div class="post-viewer-header">
+        <h2 id="post-viewer-title" class="post-viewer-title"></h2>
+        <p class="post-viewer-byline muted"></p>
+        <button type="button" class="post-viewer-close btn btn-ghost" id="post-viewer-close" aria-label="Close">Done</button>
+      </div>
+      <div id="post-viewer-body" class="post-viewer-body"></div>
+      <div class="post-viewer-actions">
+        <a href="#" id="post-viewer-bsky-link" class="btn btn-secondary" target="_blank" rel="noopener">View on Bluesky</a>
+      </div>
+    </div>
+  </div>
 
   <footer class="site-footer">
     <p>blendsky — Forum for Blender users sharing JSON geometry node setups<span id="app-version"></span></p>

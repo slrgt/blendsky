@@ -1,0 +1,11 @@
+{
+  "name": "blendsky",
+  "short_name": "blendsky",
+  "description": "Forum for Blender users. Wiki, forum, Bluesky. Easy to use on iPhone.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f0eeeb",
+  "theme_color": "#2563eb",
+  "icons": []
+}
