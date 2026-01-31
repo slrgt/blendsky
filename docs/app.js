@@ -299,6 +299,8 @@ fetch('config.json')
     });
   }
 
+  var homeB3dCardData = [];
+
   function loadDiscoverB3d() {
     var wrap = document.getElementById('home-discover-feed');
     var loading = document.getElementById('home-discover-loading');
@@ -309,25 +311,42 @@ fetch('config.json')
         loading.classList.add('hidden');
         if (posts.length === 0) {
           wrap.innerHTML = '<p class="muted">No #b3d posts right now. <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">See #b3d on Bluesky</a>.</p>';
+          homeB3dCardData = [];
           return;
         }
-        wrap.innerHTML = posts.map(function (p) {
+        homeB3dCardData = posts.map(function (p) {
           var author = p.author || {};
           var handle = author.handle || author.did || '?';
-          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 120) : '';
-          if (text.length === 120) text += '…';
+          var displayName = author.displayName || handle;
+          var fullText = (p.record && p.record.text) ? String(p.record.text) : '';
           var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : ('https://bsky.app/profile/' + (author.did || (p.uri && p.uri.split('/')[2]) || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
+          return { fullText: fullText, handle: handle, displayName: displayName, postUri: postUri };
+        });
+        wrap.innerHTML = homeB3dCardData.map(function (d, i) {
+          var text = (d.fullText || '').slice(0, 120);
+          if (text.length === 120) text += '…';
           return (
-            '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="discover-card">' +
-              '<span class="discover-handle">@' + escapeHtml(handle) + '</span>' +
+            '<a href="#" class="discover-card home-b3d-card" data-b3d-index="' + i + '" role="button">' +
+              '<span class="discover-handle">@' + escapeHtml(d.handle) + '</span>' +
               '<p class="discover-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
             '</a>'
           );
         }).join('');
+        wrap.querySelectorAll('.home-b3d-card').forEach(function (a) {
+          var idxStr = a.getAttribute('data-b3d-index');
+          if (idxStr == null) return;
+          var cardData = homeB3dCardData[parseInt(idxStr, 10)];
+          if (!cardData) return;
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            openPostViewer(cardData);
+          });
+        });
       })
       .catch(function () {
         loading.classList.add('hidden');
         wrap.innerHTML = '<p class="muted">See <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">#b3d on Bluesky</a> for recent posts.</p>';
+        homeB3dCardData = [];
       });
   }
 
@@ -350,36 +369,25 @@ fetch('config.json')
         items.forEach(function (item) {
           var post = item.post || item;
           var uri = post.uri;
-          var bskyUrl = uri ? feedPostUriToBskyUrl(uri) : null;
-          if (!bskyUrl) return;
+          var author = post.author || {};
+          var handle = author.handle || author.did || '?';
+          var displayName = author.displayName || handle;
+          var fullText = (post.record && post.record.text) ? String(post.record.text) : '';
+          var postUri = uri ? feedPostUriToBskyUrl(uri) : null;
+          var cardData = { fullText: fullText, handle: handle, displayName: displayName, postUri: postUri };
+          var snippet = fullText.slice(0, 160);
+          if (snippet.length === 160) snippet += '…';
           var cell = document.createElement('div');
-          cell.className = 'bsky-post-embed';
-          cell.dataset.embedUrl = bskyUrl;
+          cell.className = 'bsky-post-card home-feed-post-card';
+          cell.innerHTML = '<a href="#" class="bsky-post-card-link" role="button">' +
+            '<span class="bsky-post-card-handle">@' + escapeHtml(handle) + '</span>' +
+            '<p class="bsky-post-card-text">' + escapeHtml(snippet).replace(/\n/g, ' ') + '</p>' +
+            '</a>';
           wrap.appendChild(cell);
-          fetch('https://embed.bsky.app/oembed?url=' + encodeURIComponent(bskyUrl) + '&format=json&maxwidth=600')
-            .then(function (r) { return r.json(); })
-            .then(function (oembed) {
-              if (oembed && oembed.html) {
-                cell.innerHTML = oembed.html;
-                var scripts = cell.querySelectorAll('script');
-                scripts.forEach(function (s) {
-                  var ns = document.createElement('script');
-                  if (s.src) ns.src = s.src; else ns.textContent = s.textContent;
-                  document.body.appendChild(ns);
-                });
-              } else {
-                var author = post.author || {};
-                var handle = author.handle || author.did || '?';
-                var text = (post.record && post.record.text) ? String(post.record.text).slice(0, 200) : '';
-                cell.innerHTML = '<p class="muted"><a href="' + escapeHtml(bskyUrl) + '" target="_blank" rel="noopener">@' + escapeHtml(handle) + '</a>: ' + escapeHtml(text) + '…</p>';
-              }
-            })
-            .catch(function () {
-              var author = post.author || {};
-              var handle = author.handle || author.did || '?';
-              var text = (post.record && post.record.text) ? String(post.record.text).slice(0, 200) : '';
-              cell.innerHTML = '<p class="muted"><a href="' + (uri ? feedPostUriToBskyUrl(uri) : '#') + '" target="_blank" rel="noopener">@' + escapeHtml(handle) + '</a>: ' + escapeHtml(text) + '…</p>';
-            });
+          cell.querySelector('.bsky-post-card-link').addEventListener('click', function (e) {
+            e.preventDefault();
+            openPostViewer(cardData);
+          });
         });
       })
       .catch(function () { if (!append) wrap.innerHTML = '<p class="muted">Could not load feed.</p>'; });
@@ -1608,21 +1616,32 @@ fetch('config.json')
     }
   }
 
-  /** Open on-site viewer for a community feed post (so users stay on the site, not Bluesky). */
+  /** Open on-site viewer for a Bluesky or Standard.site post (appview: stay in-app, not bsky.app). */
   function openPostViewer(data) {
     var overlay = document.getElementById('post-viewer-overlay');
     var titleEl = document.getElementById('post-viewer-title');
     var bylineEl = overlay && overlay.querySelector('.post-viewer-byline');
+    var actionsEl = overlay && overlay.querySelector('.post-viewer-actions');
     var bodyEl = document.getElementById('post-viewer-body');
     if (!overlay || !titleEl || !bodyEl) return;
     var text = (data && data.fullText) ? String(data.fullText) : '';
     var firstLine = text.split('\n')[0] || text;
-    var title = firstLine.length > 80 ? firstLine.slice(0, 77) + '…' : firstLine || 'Thread';
+    var title = firstLine.length > 80 ? firstLine.slice(0, 77) + '…' : firstLine || 'Post';
     var handle = (data && data.handle) ? data.handle : '?';
     var displayName = (data && data.displayName) ? data.displayName : handle;
     titleEl.textContent = title;
     if (bylineEl) bylineEl.textContent = 'By @' + (displayName || handle);
     bodyEl.innerHTML = simpleMarkdown(text);
+    if (actionsEl) {
+      var postUri = data && data.postUri;
+      if (postUri) {
+        actionsEl.innerHTML = '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="btn btn-secondary">View on Bluesky</a>';
+        actionsEl.classList.remove('hidden');
+      } else {
+        actionsEl.innerHTML = '';
+        actionsEl.classList.add('hidden');
+      }
+    }
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden', 'false');
     var closeBtn = document.getElementById('post-viewer-close');

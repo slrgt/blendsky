@@ -286,10 +286,41 @@ body {
   gap: 1rem;
 }
 
+.home-feed-section .bsky-post-card,
 .home-feed-section .bsky-post-embed {
-  min-height: 120px;
+  min-height: 80px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+}
+
+.bsky-post-card-link {
+  display: block;
+  padding: 0.85rem 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.bsky-post-card-link:hover {
+  background: var(--bg-elevated);
+}
+
+.bsky-post-card-handle {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.bsky-post-card-text {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.home-feed-section .bsky-post-embed:not(.bsky-post-card) {
+  min-height: 120px;
   overflow: hidden;
 }
 
