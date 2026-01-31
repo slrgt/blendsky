@@ -116,11 +116,12 @@ fetch('config.json')
     var descEl = document.getElementById('home-recent-desc');
     if (!wrap) return;
     var session = getStoredSession();
-
-    if (session && session.did) {
-      if (descEl) descEl.textContent = 'Recent wiki and forum posts from the community. Author DID and Bluesky profile linked.';
+    var loadCommunity = function () {
+      if (descEl) descEl.textContent = session && session.did
+        ? 'Recent wiki and forum posts from the community. Author DID and Bluesky profile linked.'
+        : 'Recent wiki and forum posts from the community (search #blendsky-forum and #blendsky-wiki on Bluesky).';
       wrap.innerHTML = '<p class="muted">Loading…</p>';
-      Promise.all([
+      return Promise.all([
         searchPostsBluesky('#blendsky-forum', 10).catch(function () { return { posts: [] }; }),
         searchPostsBluesky('#blendsky-wiki', 10).catch(function () { return { posts: [] }; })
       ])
@@ -167,41 +168,9 @@ fetch('config.json')
         .catch(function () {
           wrap.innerHTML = '<p class="muted">Could not load community posts. <a href="https://bsky.app/search?q=%23blendsky-forum" target="_blank" rel="noopener">Search #blendsky-forum</a> or <a href="https://bsky.app/search?q=%23blendsky-wiki" target="_blank" rel="noopener">#blendsky-wiki</a> on Bluesky.</p>';
         });
-      return;
-    }
+    };
 
-    if (descEl) descEl.textContent = 'Your latest wiki pages and forum threads.';
-    var wikiPages = getWikiPages();
-    var forumData = getForumData();
-    var wikiKeys = Object.keys(wikiPages).sort().slice(-5).reverse();
-    var threads = (forumData.threads || []).slice().reverse().slice(0, 5);
-    var parts = [];
-    wikiKeys.forEach(function (slug) {
-      var p = wikiPages[slug];
-      var title = (p && p.title) || slug;
-      parts.push('<a href="#" class="home-recent-item" data-nav="wiki" data-wiki-slug="' + escapeHtml(slug) + '"><span class="home-recent-type">Wiki</span> ' + escapeHtml(title) + '</a>');
-    });
-    threads.forEach(function (t) {
-      parts.push('<a href="#" class="home-recent-item" data-nav="forum" data-thread-id="' + t.id + '"><span class="home-recent-type">Forum</span> ' + escapeHtml(t.title || 'Untitled') + '</a>');
-    });
-    if (parts.length === 0) {
-      wrap.innerHTML = '<p class="muted">No wiki pages or forum threads yet. Create one from Wiki or Forum.</p>';
-      return;
-    }
-    wrap.innerHTML = parts.join('');
-    wrap.querySelectorAll('.home-recent-item').forEach(function (a) {
-      a.addEventListener('click', function (e) {
-        e.preventDefault();
-        var nav = a.getAttribute('data-nav');
-        if (nav === 'wiki') {
-          showView('wiki');
-          openWikiPage(a.getAttribute('data-wiki-slug'));
-        } else if (nav === 'forum') {
-          showView('forum');
-          openThread(Number(a.getAttribute('data-thread-id')));
-        }
-      });
-    });
+    loadCommunity();
   }
 
   function loadDiscoverB3d() {
@@ -1167,7 +1136,7 @@ fetch('config.json')
   /** Fetch DIDs that link to target (e.g. app.blendsky.document records whose .site = origin). Returns Promise<{ uri, did }[]>. */
   function fetchConstellationLinks(targetOrigin, collection, path, limit) {
     var url = CONSTELLATION_BASE + '/links?target=' + encodeURIComponent(targetOrigin) + '&collection=' + encodeURIComponent(collection || 'app.blendsky.document') + '&path=' + encodeURIComponent(path || '.site') + '&limit=' + (limit || 30);
-    return fetch(url, { headers: { Accept: 'application/json' } })
+    return fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'blendsky/1.0' } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var links = (data && data.links) || (data && data.sources) || (data && data.records) || (Array.isArray(data) ? data : []);
@@ -1399,7 +1368,16 @@ fetch('config.json')
           record: record
         })
       }).then(function (res) {
-        if (!res.ok) return res.json().then(function (err) { throw new Error(err.message || err.error || res.statusText); });
+        if (!res.ok) {
+          return res.json().then(function (err) {
+            var msg = (err && (err.message || err.error)) || res.statusText;
+            if (err && err.error) msg = (err.error + (err.message ? ': ' + err.message : ''));
+            throw new Error(msg);
+          }).catch(function (parseErr) {
+            if (parseErr instanceof Error && parseErr.message && parseErr.message.indexOf('Unexpected') === -1) throw parseErr;
+            throw new Error(res.status + ' ' + res.statusText);
+          });
+        }
         return res.json();
       });
     });
@@ -1446,7 +1424,16 @@ fetch('config.json')
           record: record
         })
       }).then(function (res) {
-        if (!res.ok) return res.json().then(function (err) { throw new Error(err.message || err.error || res.statusText); });
+        if (!res.ok) {
+          return res.json().then(function (err) {
+            var msg = (err && (err.message || err.error)) || res.statusText;
+            if (err && err.error) msg = (err.error + (err.message ? ': ' + err.message : ''));
+            throw new Error(msg);
+          }).catch(function (parseErr) {
+            if (parseErr instanceof Error && parseErr.message && parseErr.message.indexOf('Unexpected') === -1) throw parseErr;
+            throw new Error(res.status + ' ' + res.statusText);
+          });
+        }
         return res.json();
       });
     });
@@ -1571,7 +1558,7 @@ fetch('config.json')
   var syncingWikiSlug = null;
   var syncingForumId = null;
 
-  /** Full sync: put app.blendsky.document + post feed (single or thread). Updates page.atUri. */
+  /** Full sync: put app.blendsky.document + post feed (single or thread). Updates page.atUri. If document put fails, still posts feed so others can find via #blendsky-wiki. */
   function doSyncWikiPage(slug) {
     var pages = getWikiPages();
     var page = pages[slug];
@@ -1582,24 +1569,33 @@ fetch('config.json')
     var baseUrl = typeof location !== 'undefined' ? location.origin : '';
     var record = BlendskyLexicon.documentFromWikiPage(page, slug, baseUrl);
     var rkey = sanitizeRkey(slug);
+    var docPutError = null;
     return putRecordToBluesky(BlendskyLexicon.NS_DOCUMENT, rkey, record)
       .then(function (res) {
         page.atUri = res.uri;
         page.updatedAt = new Date().toISOString();
         return postContentAsFeed(page.title, (page.body || '') + '\n\n#blendsky-wiki');
       })
+      .catch(function (err) {
+        docPutError = err;
+        return postContentAsFeed(page.title, (page.body || '') + '\n\n#blendsky-wiki');
+      })
       .then(function () {
         pages[slug] = page;
         setWikiPages(pages);
+        if (docPutError) {
+          var msg = 'Document could not be saved to AT Protocol: ' + (docPutError.message || docPutError) + '. Your post was still published to Bluesky so others can find it via #blendsky-wiki.';
+          return Promise.reject(new Error(msg));
+        }
       })
       .catch(function (err) {
         if (err && err.message) console.error('Wiki sync:', err.message);
         throw err;
       })
-      .then(function () { syncingWikiSlug = null; }, function () { syncingWikiSlug = null; });
+      .then(function () { syncingWikiSlug = null; }, function (e) { syncingWikiSlug = null; throw e; });
   }
 
-  /** Full sync: put app.blendsky.document + post feed (single or thread). Updates thread.atUri. */
+  /** Full sync: put app.blendsky.document + post feed (single or thread). Updates thread.atUri. If document put fails, still posts feed so others can find via #blendsky-forum. */
   function doSyncForumThread(threadId) {
     var data = getForumData();
     var thread = data.threads.find(function (t) { return t.id === threadId; });
@@ -1612,21 +1608,30 @@ fetch('config.json')
     var rkey = sanitizeRkey(thread.path || 'thread-' + thread.id);
     var bodyWithTag = (thread.body || '') + '\n\n#blendsky-forum';
     var blobRefs = extractBlobRefsFromBody(thread.body || '');
+    var docPutError = null;
     return putRecordToBluesky(BlendskyLexicon.NS_DOCUMENT, rkey, record)
       .then(function (res) {
         thread.atUri = res.uri;
         thread.updatedAt = new Date().toISOString();
         return postContentAsFeed(thread.title, bodyWithTag, blobRefs);
       })
+      .catch(function (err) {
+        docPutError = err;
+        return postContentAsFeed(thread.title, bodyWithTag, blobRefs);
+      })
       .then(function (result) {
         if (result && result.postUris && result.postUris[0]) thread.feedPostUri = result.postUris[0];
         setForumData(data);
+        if (docPutError) {
+          var msg = 'Document could not be saved to AT Protocol: ' + (docPutError.message || docPutError) + '. Your post was still published to Bluesky so others can find it via #blendsky-forum.';
+          return Promise.reject(new Error(msg));
+        }
       })
       .catch(function (err) {
         if (err && err.message) console.error('Forum sync:', err.message);
         throw err;
       })
-      .then(function () { syncingForumId = null; }, function () { syncingForumId = null; });
+      .then(function () { syncingForumId = null; }, function (e) { syncingForumId = null; throw e; });
   }
 
   function renderBlueskyFeed(items, append) {
