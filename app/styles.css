@@ -244,6 +244,49 @@ body {
   margin-right: 0.5rem;
 }
 
+.home-recent-network-card {
+  padding: 1rem 1.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+}
+
+.home-recent-network-text {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.home-recent-network-author {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.home-recent-did {
+  font-size: 0.8rem;
+  font-family: monospace;
+  color: var(--text-muted);
+}
+
+.home-recent-profile-link,
+.home-recent-post-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.home-recent-profile-link:hover,
+.home-recent-post-link:hover {
+  text-decoration: underline;
+}
+
+.home-recent-network-actions {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .trending-header {
   margin-bottom: 0.75rem;
 }
@@ -579,6 +622,72 @@ body {
   gap: 0.5rem;
 }
 
+.wiki-from-others {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.wiki-from-others h3 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}
+
+.wiki-from-others-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.wiki-from-others-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.wiki-from-others-card {
+  padding: 1rem 1.25rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.wiki-from-others-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.wiki-from-others-card-link:hover .wiki-from-others-text {
+  color: var(--accent);
+}
+
+.wiki-from-others-text {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.wiki-from-others-author {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.wiki-from-others-author a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.wiki-from-others-author a:hover {
+  text-decoration: underline;
+}
+
+.wiki-from-others-did {
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+
 .hidden {
   display: none !important;
 }
@@ -643,6 +752,36 @@ body {
 
 .forum-discover-card:hover {
   border-color: var(--accent);
+}
+
+.forum-discover-card-wrap {
+  margin-bottom: 0.75rem;
+}
+
+.forum-discover-card-wrap .forum-discover-card {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.forum-discover-author-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding-left: 0.25rem;
+}
+
+.forum-discover-did {
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+.forum-discover-profile-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.forum-discover-profile-link:hover {
+  text-decoration: underline;
 }
 
 .forum-reply-on-bluesky {

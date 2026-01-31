@@ -29,7 +29,7 @@
       <div id="home-trending" class="home-trending home-two-col">
         <div class="home-recent-col">
           <h2 class="home-col-title">Recent</h2>
-          <p class="home-col-desc muted">Your latest wiki pages and forum threads.</p>
+          <p id="home-recent-desc" class="home-col-desc muted">Your latest wiki pages and forum threads.</p>
           <div id="home-recent-feed" class="home-recent-feed"></div>
         </div>
         <div class="home-bluesky-col">
@@ -115,6 +115,11 @@
             </div>
           </div>
         </article>
+      </div>
+      <div id="wiki-from-others" class="wiki-from-others">
+        <h3>Wiki articles from others</h3>
+        <p class="wiki-from-others-hint muted">Posts with <strong>#blendsky-wiki</strong>. Author DID and Bluesky profile linked.</p>
+        <div id="wiki-from-others-feed" class="wiki-from-others-feed"><p class="muted" id="wiki-from-others-loading">Loading…</p></div>
       </div>
     </section>
 
