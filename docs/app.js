@@ -2839,7 +2839,6 @@ fetch('config.json')
       '<button type="button" class="btn ' + (collectionEditMode ? 'btn-primary' : 'btn-secondary') + ' collection-edit-btn" data-collection-action="toggleEdit">' + (collectionEditMode ? 'Cancel' : 'Edit') + '</button></div></div>' +
       albumsHtml + '<div class="archive-page-grid">' + itemsHtml + '</div>';
 
-    // Delegate clicks
     container.querySelectorAll('[data-collection-filter]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         if (e.target.tagName === 'INPUT') return;
@@ -2887,7 +2886,6 @@ fetch('config.json')
       });
     });
 
-    // Load images async
     items.forEach(function (item) {
       loadArchiveItemImage(item, function (src) {
         if (!src) return;
