@@ -16,6 +16,7 @@
     const doc = {
       $type: NS_DOCUMENT,
       kind: 'wiki',
+      app: 'blendsky',
       site: baseUrl || (typeof location !== 'undefined' ? location.origin : ''),
       path: '/' + (slug || 'untitled').replace(/^\//, ''),
       title: page.title || 'Untitled',
@@ -36,6 +37,7 @@
     return {
       $type: NS_DOCUMENT,
       kind: 'forum',
+      app: 'blendsky',
       site: baseUrl || (typeof location !== 'undefined' ? location.origin : ''),
       path: thread.path ? '/' + thread.path.replace(/^\//, '') : '/thread/' + thread.id,
       title: thread.title || 'Untitled',

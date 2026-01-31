@@ -445,39 +445,65 @@ fetch('config.json')
     var wrap = document.getElementById('wiki-from-others-feed');
     var loading = document.getElementById('wiki-from-others-loading');
     if (!wrap || !loading) return;
-    searchPostsBluesky('#blendsky-wiki', 10)
-      .then(function (data) {
-        var posts = (data && data.posts) || (data && data.feed) || [];
-        loading.classList.add('hidden');
-        if (posts.length === 0) {
-          wrap.innerHTML = '<p class="muted">No #blendsky-wiki posts yet. Sync a wiki page to Bluesky to add the tag.</p>';
-          return;
-        }
-        wrap.innerHTML = posts.map(function (p) {
-          var author = p.author || {};
-          var handle = author.handle || author.did || '?';
-          var did = author.did || '';
-          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 140) : '';
-          if (text.length === 140) text += '…';
-          var postUrl = feedPostUriToBskyUrl(p.uri) || ('https://bsky.app/profile/' + encodeURIComponent(did) + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
-          var profileUrl = bskyProfileUrl(author);
+    // Lexicon-based discovery: app.blendsky.document with .app = 'blendsky', kind = 'wiki' (no hashtag required)
+    fetchConstellationLinks('blendsky', 'app.blendsky.document', '.app', 40).then(function (links) {
+      return Promise.all(links.slice(0, 25).map(function (l) {
+        return fetchAtRecord(l.uri).then(function (data) {
+          var record = data.value || data.record;
+          if (!record || (record.kind && record.kind !== 'wiki')) return null;
+          var title = (record && record.title) || 'Untitled';
+          var content = (record && (record.content || record.textContent)) || '';
+          var snippet = String(content).replace(/\n/g, ' ').slice(0, 140);
+          if (snippet.length === 140) snippet += '…';
+          return { uri: l.uri, did: l.did, title: title, snippet: snippet };
+        }).catch(function () { return null; });
+      })).then(function (arr) { return arr.filter(Boolean); });
+    }).then(function (wikiCards) {
+      loading.classList.add('hidden');
+      if (wikiCards.length === 0) {
+        wrap.innerHTML = '<p class="muted">No wiki articles from others yet. Sync a page to Bluesky (uses app.blendsky.document). No hashtag required.</p>';
+        return;
+      }
+      var profilePromises = wikiCards.map(function (c) { return getProfileByDid(c.did).then(function (p) { c.profile = p; return c; }); });
+      Promise.all(profilePromises).then(function () {
+        wrap.innerHTML = wikiCards.map(function (c) {
+          var profile = c.profile || {};
+          var handle = profile.handle || c.did || '?';
+          var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
           return (
-            '<div class="wiki-from-others-card">' +
-              '<a href="' + escapeHtml(postUrl) + '" target="_blank" rel="noopener" class="wiki-from-others-card-link">' +
-                '<p class="wiki-from-others-text">' + escapeHtml(text).replace(/\n/g, ' ') + '</p>' +
+            '<div class="wiki-from-others-card" data-wiki-uri="' + escapeHtml(c.uri) + '">' +
+              '<a href="#" class="wiki-from-others-card-link wiki-from-others-card-lexicon" title="Click to copy AT URI; paste in Forum import to open">' +
+                '<strong class="wiki-from-others-title">' + escapeHtml(c.title) + '</strong>' +
+                '<p class="wiki-from-others-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
               '</a>' +
               '<p class="wiki-from-others-author">' +
                 'By <a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener">@' + escapeHtml(handle) + '</a>' +
-                (did ? ' <span class="wiki-from-others-did" title="' + escapeHtml(did) + '">DID: ' + escapeHtml(did.length > 28 ? did.slice(0, 20) + '…' : did) + '</span>' : '') +
+                (c.did ? ' <span class="wiki-from-others-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span>' : '') +
               '</p>' +
             '</div>'
           );
         }).join('');
-      })
-      .catch(function () {
-        loading.classList.add('hidden');
-        wrap.innerHTML = '<p class="muted">See <a href="https://bsky.app/search?q=%23blendsky-wiki" target="_blank" rel="noopener">#blendsky-wiki on Bluesky</a> for wiki articles from others.</p>';
+        wrap.querySelectorAll('.wiki-from-others-card-lexicon').forEach(function (a) {
+          var card = a.closest('.wiki-from-others-card');
+          var uri = card && card.getAttribute('data-wiki-uri');
+          if (!uri) return;
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(uri).then(function () {
+                var t = a.querySelector('.wiki-from-others-title');
+                if (t) { var orig = t.textContent; t.textContent = 'Copied! Paste in Forum import.'; setTimeout(function () { t.textContent = orig; }, 1500); }
+              });
+            } else {
+              prompt('AT URI (paste in Forum import):', uri);
+            }
+          });
+        });
       });
+    }).catch(function () {
+      loading.classList.add('hidden');
+      wrap.innerHTML = '<p class="muted">Could not load wiki articles. Sync a page to Bluesky (app.blendsky.document). No hashtag required.</p>';
+    });
   }
 
   document.getElementById('wiki-new').addEventListener('click', function () {
@@ -1166,22 +1192,21 @@ fetch('config.json')
     if (!wrap) return;
     wrap.innerHTML = '<p class="muted" id="forum-discover-loading">Loading…</p>';
     var loading = document.getElementById('forum-discover-loading');
-    var origin = typeof location !== 'undefined' ? location.origin : '';
-    var lexiconPromise = origin
-      ? fetchConstellationLinks(origin, 'app.blendsky.document', '.site', 25).then(function (links) {
-          return Promise.all(links.slice(0, 15).map(function (l) {
-            return fetchAtRecord(l.uri).then(function (data) {
-              var record = data.value || data.record;
-              var title = (record && record.title) || 'Untitled';
-              var content = (record && (record.content || record.textContent)) || '';
-              var snippet = String(content).replace(/\n/g, ' ').slice(0, 160);
-              if (snippet.length === 160) snippet += '…';
-              return { _type: 'lexicon', uri: l.uri, did: l.did, title: title, snippet: snippet };
-            }).catch(function () { return null; });
-          })).then(function (arr) { return arr.filter(Boolean); });
-        })
-      : Promise.resolve([]);
-    var feedPromise = searchPostsBluesky('#blendsky-forum', 25).then(function (data) {
+    // Lexicon-based discovery: all app.blendsky.document records with .app = 'blendsky' (no hashtag required)
+    var lexiconPromise = fetchConstellationLinks('blendsky', 'app.blendsky.document', '.app', 50).then(function (links) {
+      return Promise.all(links.slice(0, 30).map(function (l) {
+        return fetchAtRecord(l.uri).then(function (data) {
+          var record = data.value || data.record;
+          if (!record || (record.kind && record.kind !== 'forum')) return null;
+          var title = (record && record.title) || 'Untitled';
+          var content = (record && (record.content || record.textContent)) || '';
+          var snippet = String(content).replace(/\n/g, ' ').slice(0, 160);
+          if (snippet.length === 160) snippet += '…';
+          return { _type: 'lexicon', uri: l.uri, did: l.did, title: title, snippet: snippet };
+        }).catch(function () { return null; });
+      })).then(function (arr) { return arr.filter(Boolean); });
+    });
+    var feedPromise = searchPostsBluesky('#blendsky-forum', 15).then(function (data) {
       var posts = (data && data.posts) || (data && data.feed) || [];
       return { cards: posts.map(function (p) {
         var author = p.author || {};
@@ -1201,6 +1226,34 @@ fetch('config.json')
       var profilePromises = lexiconCards.map(function (c) { return getProfileByDid(c.did).then(function (p) { c.profile = p; return c; }); });
       Promise.all(profilePromises).then(function () {
         var parts = [];
+        // Lexicon cards first (shared app.blendsky.document, no hashtag required)
+        lexiconCards.forEach(function (c) {
+          var profile = c.profile || {};
+          var handle = profile.handle || c.did || '?';
+          var displayName = profile.displayName || handle;
+          var avatarUrl = profile.avatar || '';
+          var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
+          var avatarHtml = avatarUrl
+            ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
+            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
+          parts.push(
+            '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '">' +
+              '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to import this document">' +
+                '<div class="forum-discover-byline">' +
+                  avatarHtml +
+                  '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
+                  '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
+                '</div>' +
+                '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
+              '</a>' +
+              '<p class="forum-discover-author-meta">' +
+                (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
+                '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
+                '<span class="forum-discover-lexicon-tag">app.blendsky.document</span>' +
+              '</p>' +
+            '</div>'
+          );
+        });
         feedCards.forEach(function (c) {
           var p = c.post;
           var author = p.author || {};
@@ -1230,33 +1283,6 @@ fetch('config.json')
             '</div>'
           );
         });
-        lexiconCards.forEach(function (c) {
-          var profile = c.profile || {};
-          var handle = profile.handle || c.did || '?';
-          var displayName = profile.displayName || handle;
-          var avatarUrl = profile.avatar || '';
-          var profileUrl = 'https://bsky.app/profile/' + encodeURIComponent(handle || c.did);
-          var avatarHtml = avatarUrl
-            ? '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="forum-discover-avatar" loading="lazy" />'
-            : '<span class="forum-discover-avatar forum-discover-avatar-placeholder" aria-hidden="true">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</span>';
-          parts.push(
-            '<div class="forum-discover-card-wrap" data-lexicon-uri="' + escapeHtml(c.uri) + '">' +
-              '<a href="#" class="forum-discover-card forum-discover-card-lexicon" title="Click to import this document">' +
-                '<div class="forum-discover-byline">' +
-                  avatarHtml +
-                  '<span class="forum-discover-name">' + escapeHtml(c.title) + '</span>' +
-                  '<span class="forum-discover-handle">@' + escapeHtml(handle) + '</span>' +
-                '</div>' +
-                '<p class="discover-text">' + escapeHtml(c.snippet).replace(/\n/g, ' ') + '</p>' +
-              '</a>' +
-              '<p class="forum-discover-author-meta">' +
-                (c.did ? '<span class="forum-discover-did" title="' + escapeHtml(c.did) + '">DID: ' + escapeHtml(c.did.length > 28 ? c.did.slice(0, 20) + '…' : c.did) + '</span> ' : '') +
-                '<a href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noopener" class="forum-discover-profile-link">Bluesky profile</a> · ' +
-                '<span class="forum-discover-lexicon-tag">app.blendsky.document</span>' +
-              '</p>' +
-            '</div>'
-          );
-        });
         if (parts.length === 0) {
           var session = getStoredSession();
           var needLogin = !session || !session.accessJwt;
@@ -1264,7 +1290,7 @@ fetch('config.json')
             ? 'Connect your Bluesky account to see forum posts from other users. Use <strong>Log in</strong> (top right), then click <strong>Refresh</strong> below to load community posts.'
             : needLogin
               ? 'Connect your Bluesky account (Log in, top right) to see forum posts from other users. After connecting, click Refresh below.'
-              : 'No forum posts from others yet. Sync your own thread to Bluesky to appear here, or paste an AT URI below to import a thread.';
+              : 'No forum posts from others yet. Sync your thread to Bluesky (uses app.blendsky.document). No hashtag required. Or paste an AT URI below to import a thread.';
           wrap.innerHTML = '<p class="muted forum-discover-empty">' + msg + '</p><p class="forum-discover-refresh-wrap"><button type="button" class="btn btn-ghost forum-discover-refresh" id="forum-discover-refresh">Refresh community posts</button></p>';
           var refreshBtn = wrap.querySelector('#forum-discover-refresh');
           if (refreshBtn) refreshBtn.addEventListener('click', function () { loadForumDiscover(); });
