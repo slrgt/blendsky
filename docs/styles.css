@@ -544,6 +544,10 @@ body {
   font-size: 1rem;
 }
 
+.bluesky-app-password.hidden {
+  display: none;
+}
+
 .bluesky-hint {
   font-size: 0.85rem;
   color: var(--text-muted);
