@@ -15,6 +15,7 @@ fetch('config.json')
 
   var STORAGE_WIKI = 'blendsky_wiki';
   var STORAGE_FORUM = 'blendsky_forum';
+  var STORAGE_FORUM_VOTES = 'blendsky_forum_votes';
   var STORAGE_BSKY = 'blendsky_session';
   var DEFAULT_PDS = 'https://bsky.social';
   var APP_VIEW = 'https://api.bsky.app';
@@ -41,7 +42,16 @@ fetch('config.json')
     if (id === 'home') {
       loadHomeRecent();
       loadDiscoverB3d();
-      loadConstellationStats();
+      var session = getStoredSession();
+      var homeFeedSection = document.getElementById('home-bluesky-section');
+      if (homeFeedSection) {
+        if (session && session.accessJwt) {
+          homeFeedSection.classList.remove('hidden');
+          loadHomeBlueskyFeed();
+        } else {
+          homeFeedSection.classList.add('hidden');
+        }
+      }
     }
   }
 
@@ -195,7 +205,7 @@ fetch('config.json')
     var wrap = document.getElementById('home-discover-feed');
     var loading = document.getElementById('home-discover-loading');
     if (!wrap || !loading) return;
-    searchPostsBluesky('#b3d', 8)
+    searchPostsBluesky('#b3d', 12)
       .then(function (data) {
         var posts = (data && data.posts) || (data && data.feed) || [];
         loading.classList.add('hidden');
@@ -206,8 +216,8 @@ fetch('config.json')
         wrap.innerHTML = posts.map(function (p) {
           var author = p.author || {};
           var handle = author.handle || author.did || '?';
-          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 160) : '';
-          if (text.length === 160) text += '…';
+          var text = (p.record && p.record.text) ? String(p.record.text).slice(0, 120) : '';
+          if (text.length === 120) text += '…';
           var postUri = p.uri ? feedPostUriToBskyUrl(p.uri) : ('https://bsky.app/profile/' + (author.did || (p.uri && p.uri.split('/')[2]) || '') + '/post/' + (p.uri ? p.uri.split('/').pop() : ''));
           return (
             '<a href="' + escapeHtml(postUri) + '" target="_blank" rel="noopener" class="discover-card">' +
@@ -221,6 +231,60 @@ fetch('config.json')
         loading.classList.add('hidden');
         wrap.innerHTML = '<p class="muted">See <a href="https://bsky.app/search?q=%23b3d" target="_blank" rel="noopener">#b3d on Bluesky</a> for recent posts.</p>';
       });
+  }
+
+  var homeFeedCursor = null;
+  function loadHomeBlueskyFeed(append) {
+    var wrap = document.getElementById('home-bluesky-feed');
+    if (!wrap) return;
+    var session = getStoredSession();
+    if (!session || !session.accessJwt || !session.pdsUrl) return;
+    var url = session.pdsUrl.replace(/\/$/, '') + '/xrpc/app.bsky.feed.getTimeline?limit=20';
+    if (append && homeFeedCursor) url += '&cursor=' + encodeURIComponent(homeFeedCursor);
+    fetch(url, { headers: { Authorization: 'Bearer ' + session.accessJwt } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var items = (data && data.feed) || [];
+        homeFeedCursor = data && data.cursor ? data.cursor : null;
+        var loadMoreBtn = document.getElementById('home-bluesky-load-more');
+        if (loadMoreBtn) loadMoreBtn.classList.toggle('hidden', !homeFeedCursor);
+        if (!append) wrap.innerHTML = '';
+        items.forEach(function (item) {
+          var post = item.post || item;
+          var uri = post.uri;
+          var bskyUrl = uri ? feedPostUriToBskyUrl(uri) : null;
+          if (!bskyUrl) return;
+          var cell = document.createElement('div');
+          cell.className = 'bsky-post-embed';
+          cell.dataset.embedUrl = bskyUrl;
+          wrap.appendChild(cell);
+          fetch('https://embed.bsky.app/oembed?url=' + encodeURIComponent(bskyUrl) + '&format=json&maxwidth=600')
+            .then(function (r) { return r.json(); })
+            .then(function (oembed) {
+              if (oembed && oembed.html) {
+                cell.innerHTML = oembed.html;
+                var scripts = cell.querySelectorAll('script');
+                scripts.forEach(function (s) {
+                  var ns = document.createElement('script');
+                  if (s.src) ns.src = s.src; else ns.textContent = s.textContent;
+                  document.body.appendChild(ns);
+                });
+              } else {
+                var author = post.author || {};
+                var handle = author.handle || author.did || '?';
+                var text = (post.record && post.record.text) ? String(post.record.text).slice(0, 200) : '';
+                cell.innerHTML = '<p class="muted"><a href="' + escapeHtml(bskyUrl) + '" target="_blank" rel="noopener">@' + escapeHtml(handle) + '</a>: ' + escapeHtml(text) + '…</p>';
+              }
+            })
+            .catch(function () {
+              var author = post.author || {};
+              var handle = author.handle || author.did || '?';
+              var text = (post.record && post.record.text) ? String(post.record.text).slice(0, 200) : '';
+              cell.innerHTML = '<p class="muted"><a href="' + (uri ? feedPostUriToBskyUrl(uri) : '#') + '" target="_blank" rel="noopener">@' + escapeHtml(handle) + '</a>: ' + escapeHtml(text) + '…</p>';
+            });
+        });
+      })
+      .catch(function () { if (!append) wrap.innerHTML = '<p class="muted">Could not load feed.</p>'; });
   }
 
   navLinks.forEach(function (a) {
@@ -568,6 +632,26 @@ fetch('config.json')
     localStorage.setItem(STORAGE_FORUM, JSON.stringify(data));
   }
 
+  function getForumVotes() {
+    try {
+      var raw = localStorage.getItem(STORAGE_FORUM_VOTES);
+      return raw ? JSON.parse(raw) : {};
+    } catch (_) { return {}; }
+  }
+  function setForumVotes(votes) {
+    localStorage.setItem(STORAGE_FORUM_VOTES, JSON.stringify(votes));
+  }
+  function getThreadVote(threadId) {
+    var votes = getForumVotes();
+    var v = votes['t' + threadId];
+    return v === 1 ? 1 : v === -1 ? -1 : 0;
+  }
+  function setThreadVote(threadId, value) {
+    var votes = getForumVotes();
+    votes['t' + threadId] = value;
+    setForumVotes(votes);
+  }
+
   function renderThreadList() {
     const data = getForumData();
     const list = document.getElementById('forum-thread-list');
@@ -583,28 +667,50 @@ fetch('config.json')
             .slice()
             .reverse()
             .map(function (t) {
+              var vote = getThreadVote(t.id);
+              var score = (t.score !== undefined ? t.score : 0) + (vote === 1 ? 1 : vote === -1 ? -1 : 0);
               var status = syncingForumId === t.id ? 'syncing' : (t.atUri ? 'synced' : 'local');
               var badge = '<span class="sync-badge sync-' + status + '">' + (status === 'syncing' ? 'Syncing…' : status === 'synced' ? 'Synced' : 'Local') + '</span>';
               return (
-                '<a href="#" class="forum-thread-card" data-thread-id="' +
-                t.id +
-                '"><h3>' +
-                escapeHtml(t.title) +
-                '</h3><span class="meta">' +
-                escapeHtml(t.author || 'Anonymous') +
-                ' · ' +
-                (t.replies ? t.replies.length : 0) +
-                ' replies</span> ' +
-                badge +
-                '</a>'
+                '<div class="forum-thread-row" data-thread-id="' + t.id + '">' +
+                  '<div class="forum-vote-col">' +
+                    '<button type="button" class="forum-vote-btn forum-vote-up" aria-label="Upvote" title="Upvote">▲</button>' +
+                    '<span class="forum-vote-score">' + score + '</span>' +
+                    '<button type="button" class="forum-vote-btn forum-vote-down" aria-label="Downvote" title="Downvote">▼</button>' +
+                  '</div>' +
+                  '<a href="#" class="forum-thread-card">' +
+                    '<h3>' + escapeHtml(t.title) + '</h3>' +
+                    '<span class="meta">' + escapeHtml(t.author || 'Anonymous') + ' · ' + (t.replies ? t.replies.length : 0) + ' replies</span> ' +
+                    badge +
+                  '</a>' +
+                '</div>'
               );
             })
             .join('');
-    list.querySelectorAll('.forum-thread-card').forEach(function (a) {
-      a.addEventListener('click', function (e) {
-        e.preventDefault();
-        openThread(Number(a.getAttribute('data-thread-id')));
-      });
+    list.querySelectorAll('.forum-thread-row').forEach(function (row) {
+      var threadId = Number(row.getAttribute('data-thread-id'));
+      var card = row.querySelector('.forum-thread-card');
+      if (card) {
+        card.addEventListener('click', function (e) {
+          e.preventDefault();
+          openThread(threadId);
+        });
+      }
+      var upBtn = row.querySelector('.forum-vote-up');
+      var downBtn = row.querySelector('.forum-vote-down');
+      var scoreEl = row.querySelector('.forum-vote-score');
+      function updateVote() {
+        var v = getThreadVote(threadId);
+        setThreadVote(threadId, v === 1 ? 0 : 1);
+        renderThreadList();
+      }
+      function updateDown() {
+        var v = getThreadVote(threadId);
+        setThreadVote(threadId, v === -1 ? 0 : -1);
+        renderThreadList();
+      }
+      if (upBtn) upBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); updateVote(); });
+      if (downBtn) downBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); updateDown(); });
     });
   }
 
@@ -627,7 +733,16 @@ fetch('config.json')
       }).join(' ');
     }
     var threadStatus = syncingForumId === id ? 'Syncing…' : (thread.atUri ? 'Synced to Bluesky' : 'Local only');
-    var body = '<h2>' + escapeHtml(thread.title) + '</h2><p class="meta">' + meta + '</p><p class="sync-status sync-' + (thread.atUri ? 'synced' : 'local') + '" id="forum-thread-sync-status">' + escapeHtml(threadStatus) + '</p>';
+    var vote = getThreadVote(id);
+    var score = (thread.score !== undefined ? thread.score : 0) + (vote === 1 ? 1 : vote === -1 ? -1 : 0);
+    var body = '<div class="forum-thread-detail-header">' +
+      '<div class="forum-vote-col forum-vote-col-detail">' +
+        '<button type="button" class="forum-vote-btn forum-vote-up" data-thread-id="' + id + '" aria-label="Upvote">▲</button>' +
+        '<span class="forum-vote-score">' + score + '</span>' +
+        '<button type="button" class="forum-vote-btn forum-vote-down" data-thread-id="' + id + '" aria-label="Downvote">▼</button>' +
+      '</div>' +
+      '<div class="forum-thread-detail-main">' +
+        '<h2>' + escapeHtml(thread.title) + '</h2><p class="meta">' + meta + '</p><p class="sync-status sync-' + (thread.atUri ? 'synced' : 'local') + '" id="forum-thread-sync-status">' + escapeHtml(threadStatus) + '</p>';
     if (thread.description) {
       body += '<p class="forum-description">' + escapeHtml(thread.description) + '</p>';
     }
@@ -639,7 +754,17 @@ fetch('config.json')
     if (replyPostUrl) {
       body += '<p class="forum-reply-on-bluesky"><a href="' + escapeHtml(replyPostUrl) + '" target="_blank" rel="noopener" class="btn btn-secondary">Reply on Bluesky</a></p>';
     }
+    body += '</div></div>';
     detail.innerHTML = body;
+    detail.querySelectorAll('.forum-vote-btn[data-thread-id]').forEach(function (btn) {
+      var tid = Number(btn.getAttribute('data-thread-id'));
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var v = getThreadVote(tid);
+        setThreadVote(tid, btn.classList.contains('forum-vote-up') ? (v === 1 ? 0 : 1) : (v === -1 ? 0 : -1));
+        openThread(tid);
+      });
+    });
     const repliesList = document.getElementById('forum-replies-list');
     repliesList.innerHTML = (thread.replies || [])
       .map(function (r) {
@@ -1608,6 +1733,13 @@ fetch('config.json')
     if (document.getElementById('bluesky-app-password')) document.getElementById('bluesky-app-password').value = '';
     initBluesky();
   });
+
+  var homeLoadMore = document.getElementById('home-bluesky-load-more');
+  if (homeLoadMore) {
+    homeLoadMore.addEventListener('click', function () {
+      loadHomeBlueskyFeed(true);
+    });
+  }
 
   document.getElementById('bluesky-load-more').addEventListener('click', function () {
     const cursor = this.dataset.cursor;
