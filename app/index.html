@@ -24,6 +24,7 @@
       <nav class="main-nav">
         <a href="#" class="nav-link" data-nav="wiki">Wiki</a>
         <a href="#" class="nav-link" data-nav="forum">Forum</a>
+        <a href="#" class="nav-link" data-nav="collections">Collections</a>
         <a href="#" class="nav-link" data-nav="bluesky">Bluesky</a>
         <span id="header-login-wrap" class="header-auth-wrap">
           <a href="#" id="header-login-link" class="nav-link" data-nav="bluesky">Log in</a>
@@ -252,6 +253,13 @@
       </div>
     </section>
 
+    <!-- Collections (XoxoWiki-style) -->
+    <section id="view-collections" class="view">
+      <div class="collections-view-inner">
+        <div id="collections-container" class="collections-container"></div>
+      </div>
+    </section>
+
     <!-- Bluesky -->
     <section id="view-bluesky" class="view">
       <div class="bluesky-header">
@@ -292,6 +300,10 @@
       <span class="bottom-nav-icon" aria-hidden="true">💬</span>
       <span class="bottom-nav-label">Forum</span>
     </a>
+    <a href="#" class="bottom-nav-link" data-nav="collections">
+      <span class="bottom-nav-icon" aria-hidden="true">🖼</span>
+      <span class="bottom-nav-label">Collections</span>
+    </a>
     <a href="#" class="bottom-nav-link" data-nav="bluesky">
       <span class="bottom-nav-icon" aria-hidden="true">☁</span>
       <span class="bottom-nav-label">Bluesky</span>
@@ -309,6 +321,33 @@
       </div>
       <div id="post-viewer-body" class="post-viewer-body"></div>
       <div class="post-viewer-actions hidden" id="post-viewer-actions"></div>
+    </div>
+  </div>
+
+  <!-- Collections: Upload Media modal -->
+  <div id="collections-media-modal" class="collections-media-modal hidden" aria-hidden="true">
+    <div class="collections-media-backdrop" id="collections-media-backdrop"></div>
+    <div class="collections-media-sheet" role="dialog" aria-labelledby="collections-media-title">
+      <div class="collections-media-header">
+        <h2 id="collections-media-title">Add image to collection</h2>
+        <button type="button" class="btn btn-ghost collections-media-close" id="collections-media-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="collections-media-body">
+        <p class="collections-media-hint muted">Images stay on the AT Protocol (PDS). Paste a direct image URL; we only store the link and embed it here—no backend.</p>
+        <div class="form-group">
+          <label for="collections-media-url">Image URL (AT Protocol / Bluesky CDN or any public link)</label>
+          <input type="url" id="collections-media-url" class="form-input" placeholder="https://cdn.bsky.app/img/… or any image URL" />
+        </div>
+        <div class="form-group">
+          <label for="collections-media-source">Source URL (credit)</label>
+          <input type="url" id="collections-media-source" class="form-input" placeholder="https://…" />
+        </div>
+        <div id="collections-media-albums" class="collections-media-albums"></div>
+        <div class="collections-media-actions">
+          <button type="button" id="collections-media-save" class="btn btn-primary">Add image</button>
+          <button type="button" id="collections-media-cancel" class="btn btn-ghost">Cancel</button>
+        </div>
+      </div>
     </div>
   </div>
 

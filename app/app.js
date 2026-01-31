@@ -20,6 +20,8 @@ fetch('config.json')
   var STORAGE_FORUM = 'blendsky_forum';
   var STORAGE_FORUM_VOTES = 'blendsky_forum_votes';
   var STORAGE_BSKY = 'blendsky_session';
+  var STORAGE_ARCHIVE = 'blendsky_archive';
+  var STORAGE_ALBUMS = 'blendsky_albums';
   var DEFAULT_PDS = 'https://bsky.social';
   var APP_VIEW = 'https://api.bsky.app';
   var PUBLIC_APP_VIEW = 'https://public.api.bsky.app';
@@ -63,6 +65,7 @@ fetch('config.json')
     if (id === 'wiki') initWiki();
     if (id === 'forum') initForum();
     if (id === 'bluesky') initBluesky();
+    if (id === 'collections') initCollections();
     if (id === 'home') {
       loadHomeRecent();
       loadDiscoverB3d();
@@ -2717,6 +2720,348 @@ fetch('config.json')
       userWrap.classList.add('hidden');
     }
   }
+
+  // ——— Collections: AT Protocol image URLs only. We store references (URLs); images are served by the PDS. No backend. ———
+  function getCollectionsArchive() {
+    try {
+      var stored = localStorage.getItem(STORAGE_ARCHIVE);
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) { return []; }
+  }
+  function getCollectionsAlbums() {
+    try {
+      var stored = localStorage.getItem(STORAGE_ALBUMS);
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) { return []; }
+  }
+  function saveCollectionsAlbum(album) {
+    var albums = getCollectionsAlbums();
+    album.id = Date.now().toString();
+    album.createdAt = new Date().toISOString();
+    albums.push(album);
+    localStorage.setItem(STORAGE_ALBUMS, JSON.stringify(albums));
+    return album;
+  }
+  function saveCollectionsArchiveItem(item) {
+    if (!item.imageUrl || item.imageUrl.indexOf('http') !== 0) return null;
+    item.id = item.id || (Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9));
+    item.createdAt = item.createdAt || new Date().toISOString();
+    item.albumIds = item.albumIds || [];
+    item.type = item.type || (item.imageUrl.indexOf('video') !== -1 ? 'video' : 'image');
+    var archive = getCollectionsArchive();
+    archive.unshift(item);
+    localStorage.setItem(STORAGE_ARCHIVE, JSON.stringify(archive));
+    return item;
+  }
+  function updateCollectionsArchiveItem(id, updates) {
+    var archive = getCollectionsArchive();
+    var idx = archive.findIndex(function (a) { return a.id === id; });
+    if (idx !== -1) {
+      archive[idx] = Object.assign({}, archive[idx], updates);
+      localStorage.setItem(STORAGE_ARCHIVE, JSON.stringify(archive));
+    }
+  }
+  function deleteCollectionsArchiveItem(id) {
+    var archive = getCollectionsArchive().filter(function (a) { return a.id !== id; });
+    localStorage.setItem(STORAGE_ARCHIVE, JSON.stringify(archive));
+  }
+  function deleteCollectionsAlbum(id) {
+    var albums = getCollectionsAlbums().filter(function (a) { return a.id !== id; });
+    localStorage.setItem(STORAGE_ALBUMS, JSON.stringify(albums));
+    var archive = getCollectionsArchive().map(function (a) {
+      a.albumIds = (a.albumIds || []).filter(function (aid) { return aid !== id; });
+      return a;
+    });
+    localStorage.setItem(STORAGE_ARCHIVE, JSON.stringify(archive));
+  }
+
+  var collectionEditMode = false;
+  var selectedCollectionItems = new Set();
+  var selectedCollections = new Set();
+  var currentCollectionFilter = null;
+
+  function escapeHtmlCollections(s) {
+    if (!s) return '';
+    var div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function loadArchiveItemImage(item, callback) {
+    if (item.imageUrl && item.imageUrl.indexOf('http') === 0) {
+      callback(item.imageUrl);
+      return;
+    }
+    callback(null);
+  }
+
+  function showCollectionPage(albumFilter) {
+    var container = document.getElementById('collections-container');
+    if (!container) return;
+    currentCollectionFilter = albumFilter !== undefined && albumFilter !== null ? albumFilter : null;
+    var albums = getCollectionsAlbums();
+    var items = getCollectionsArchive();
+    if (albumFilter) {
+      items = items.filter(function (i) {
+        var itemAlbums = i.albumIds || (i.albumId ? [i.albumId] : []);
+        return itemAlbums.indexOf(albumFilter) !== -1;
+      });
+    }
+    var currentAlbum = albumFilter ? albums.find(function (a) { return a.id === albumFilter; }) : null;
+
+    var albumsHtml = albums.length > 0 ? '<div class="archive-albums-row">' +
+      '<button type="button" class="album-pill ' + (!albumFilter ? 'active' : '') + '" data-collection-filter="">All</button>' +
+      albums.map(function (a) {
+        var isSelected = selectedCollections.has(a.id);
+        return '<div class="album-pill-wrapper">' +
+          '<button type="button" class="album-pill ' + (albumFilter === a.id ? 'active' : '') + ' ' + (collectionEditMode && isSelected ? 'collection-pill-selected' : '') + '" data-collection-filter="' + escapeHtmlCollections(a.id) + '">' +
+          (collectionEditMode ? '<input type="checkbox" class="collection-pill-checkbox" ' + (isSelected ? 'checked' : '') + ' data-collection-id="' + escapeHtmlCollections(a.id) + '">' : '') +
+          escapeHtmlCollections(a.name) + '</button></div>';
+      }).join('') +
+      (!collectionEditMode ? '<button type="button" class="album-pill add-album" data-collection-action="new">+ New Collection</button>' : '') +
+      '</div>' : '';
+
+    var itemsHtml = items.length > 0 ? items.map(function (item) {
+      var isSelected = selectedCollectionItems.has(item.id);
+      return '<div class="archive-page-item ' + (collectionEditMode ? 'collection-item-selectable' : '') + ' ' + (isSelected ? 'collection-item-selected' : '') + '" data-item-id="' + escapeHtmlCollections(item.id) + '">' +
+        (collectionEditMode ? '<div class="collection-item-checkbox"><input type="checkbox" data-item-id="' + escapeHtmlCollections(item.id) + '" ' + (isSelected ? 'checked' : '') + '></div>' : '') +
+        (item.type === 'video' ? '<video data-item-id="' + escapeHtmlCollections(item.id) + '" style="background:#f0f0f0;"></video>' : '<img data-item-id="' + escapeHtmlCollections(item.id) + '" alt="" style="background:#f0f0f0;">') +
+        '<div class="archive-item-overlay">' + (item.source ? '<a href="' + escapeHtmlCollections(item.source) + '" target="_blank" rel="noopener" class="source-icon" onclick="event.stopPropagation()">src</a>' : '') + '</div></div>';
+    }).join('') : '<p class="archive-empty">No items yet. Use <strong>Add image</strong> and paste an image URL from the AT Protocol (e.g. Bluesky CDN) or any public link.</p>';
+
+    container.innerHTML = '<div class="collection-page-header">' +
+      '<h1>' + escapeHtmlCollections(currentAlbum ? currentAlbum.name : 'Collections') + '</h1>' +
+      '<div class="collection-page-header-actions">' +
+      '<button type="button" class="btn btn-primary collection-upload-btn" data-collection-action="upload">Add image</button>' +
+      (collectionEditMode ? '<div class="collection-edit-actions">' +
+        '<button type="button" class="btn btn-secondary collection-select-all-btn" data-collection-action="selectAll">Select All</button>' +
+        '<button type="button" class="btn btn-danger collection-delete-btn" data-collection-action="deleteSelected" style="' + (selectedCollectionItems.size + selectedCollections.size > 0 ? '' : 'display:none') + '">Delete (' + (selectedCollectionItems.size + selectedCollections.size) + ')</button></div>' : '') +
+      '<button type="button" class="btn ' + (collectionEditMode ? 'btn-primary' : 'btn-secondary') + ' collection-edit-btn" data-collection-action="toggleEdit">' + (collectionEditMode ? 'Cancel' : 'Edit') + '</button></div></div>' +
+      albumsHtml + '<div class="archive-page-grid">' + itemsHtml + '</div>';
+
+    container.querySelectorAll('[data-collection-filter]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        if (e.target.tagName === 'INPUT') return;
+        var filter = btn.getAttribute('data-collection-filter');
+        if (btn.classList.contains('add-album') || btn.getAttribute('data-collection-action') === 'new') {
+          createAlbum();
+          return;
+        }
+        if (collectionEditMode && filter !== '') {
+          var id = (btn.querySelector('[data-collection-id]') && btn.querySelector('[data-collection-id]').getAttribute('data-collection-id')) || filter;
+          if (selectedCollections.has(id)) selectedCollections.delete(id); else selectedCollections.add(id);
+          showCollectionPage(currentCollectionFilter);
+          return;
+        }
+        filterCollectionByAlbum(filter || null);
+      });
+    });
+    container.querySelectorAll('.archive-page-item').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        if (e.target.closest('a')) return;
+        var id = el.getAttribute('data-item-id');
+        if (collectionEditMode) {
+          if (selectedCollectionItems.has(id)) selectedCollectionItems.delete(id); else selectedCollectionItems.add(id);
+          showCollectionPage(currentCollectionFilter);
+          return;
+        }
+        viewArchiveItemPage(id);
+      });
+    });
+    container.querySelectorAll('.collection-item-checkbox input').forEach(function (cb) {
+      cb.addEventListener('click', function (e) { e.stopPropagation(); });
+      cb.addEventListener('change', function () {
+        var id = cb.getAttribute('data-item-id');
+        if (cb.checked) selectedCollectionItems.add(id); else selectedCollectionItems.delete(id);
+        showCollectionPage(currentCollectionFilter);
+      });
+    });
+    container.querySelectorAll('[data-collection-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var action = btn.getAttribute('data-collection-action');
+        if (action === 'upload') openCollectionsMediaModal();
+        if (action === 'toggleEdit') toggleCollectionEditMode();
+        if (action === 'selectAll') selectAllCollectionItems();
+        if (action === 'deleteSelected') deleteSelectedCollections();
+      });
+    });
+
+    items.forEach(function (item) {
+      loadArchiveItemImage(item, function (src) {
+        if (!src) return;
+        var el = container.querySelector('[data-item-id="' + item.id + '"] img, [data-item-id="' + item.id + '"] video');
+        if (el) el.src = src;
+      });
+    });
+  }
+
+  function createAlbum() {
+    var name = prompt('Collection name:');
+    if (name && name.trim()) {
+      saveCollectionsAlbum({ name: name.trim() });
+      showCollectionPage(currentCollectionFilter);
+    }
+  }
+
+  function filterCollectionByAlbum(albumId) {
+    showCollectionPage(albumId);
+  }
+
+  function viewArchiveItemPage(id) {
+    var item = getCollectionsArchive().find(function (a) { return a.id === id; });
+    if (!item) return;
+    var albums = getCollectionsAlbums();
+    var itemAlbums = item.albumIds || (item.albumId ? [item.albumId] : []);
+
+    var albumCheckboxes = albums.map(function (a) {
+      return '<label class="album-checkbox"><input type="checkbox" name="edit-album" value="' + escapeHtmlCollections(a.id) + '" ' + (itemAlbums.indexOf(a.id) !== -1 ? 'checked' : '') + '><span>' + escapeHtmlCollections(a.name) + '</span></label>';
+    }).join('');
+
+    loadArchiveItemImage(item, function (imageData) {
+      var overlay = document.createElement('div');
+      overlay.className = 'archive-lightbox';
+      overlay.id = 'collections-archive-lightbox';
+      overlay.innerHTML = '<div class="archive-lightbox-content">' +
+        '<button type="button" class="lightbox-close" data-lightbox-close>&times;</button>' +
+        (item.type === 'video' ? '<video src="' + (imageData || '') + '" controls></video>' : '<img src="' + (imageData || '') + '" alt="">') +
+        '<div class="archive-lightbox-form">' +
+        '<div class="form-row"><label>Source URL</label><input type="url" id="edit-archive-source" value="' + escapeHtmlCollections(item.source || '') + '" placeholder="https://…"></div>' +
+        '<div class="form-row"><label>Collections</label><div class="album-checkboxes" id="edit-archive-albums">' + (albums.length > 0 ? albumCheckboxes : '<span class="no-albums">No collections yet</span>') + '</div><button type="button" class="btn-small btn-secondary" data-lightbox-new-album>+ New Collection</button></div>' +
+        '<div class="form-row"><label>Tags</label><input type="text" id="edit-archive-tags" value="' + (item.tags ? item.tags.join(', ') : '') + '" placeholder="comma, separated"></div>' +
+        '<div class="lightbox-actions"><button type="button" class="btn btn-primary" data-lightbox-save>Save</button><button type="button" class="btn btn-danger" data-lightbox-delete>Delete</button></div></div></div>';
+      overlay.querySelector('[data-lightbox-close]').addEventListener('click', function () { overlay.remove(); });
+      overlay.querySelector('[data-lightbox-save]').addEventListener('click', function () {
+        var source = document.getElementById('edit-archive-source').value.trim();
+        var checked = overlay.querySelectorAll('#edit-archive-albums input[name="edit-album"]:checked');
+        var albumIds = Array.prototype.map.call(checked, function (c) { return c.value; });
+        var tagsEl = overlay.querySelector('#edit-archive-tags');
+        var tags = tagsEl && tagsEl.value ? tagsEl.value.split(',').map(function (t) { return t.trim(); }).filter(Boolean) : [];
+        updateCollectionsArchiveItem(id, { source: source, albumIds: albumIds, tags: tags });
+        overlay.remove();
+        showCollectionPage(currentCollectionFilter);
+      });
+      overlay.querySelector('[data-lightbox-delete]').addEventListener('click', function () {
+        if (confirm('Delete this item?')) {
+          deleteCollectionsArchiveItem(id);
+          overlay.remove();
+          showCollectionPage(currentCollectionFilter);
+        }
+      });
+      overlay.querySelector('[data-lightbox-new-album]').addEventListener('click', function () {
+        var name = prompt('Collection name:');
+        if (name && name.trim()) {
+          var album = saveCollectionsAlbum({ name: name.trim() });
+          var container = document.getElementById('edit-archive-albums');
+          var noAlbums = container && container.querySelector('.no-albums');
+          if (noAlbums) noAlbums.remove();
+          if (container) {
+            var label = document.createElement('label');
+            label.className = 'album-checkbox';
+            label.innerHTML = '<input type="checkbox" name="edit-album" value="' + album.id + '" checked><span>' + escapeHtmlCollections(album.name) + '</span>';
+            container.appendChild(label);
+          }
+        }
+      });
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+      document.body.appendChild(overlay);
+    });
+  }
+
+  function toggleCollectionEditMode() {
+    collectionEditMode = !collectionEditMode;
+    if (!collectionEditMode) {
+      selectedCollectionItems.clear();
+      selectedCollections.clear();
+    }
+    showCollectionPage(currentCollectionFilter);
+  }
+
+  function selectAllCollectionItems() {
+    var items = getCollectionsArchive();
+    var filtered = currentCollectionFilter ? items.filter(function (i) {
+      var itemAlbums = i.albumIds || (i.albumId ? [i.albumId] : []);
+      return itemAlbums.indexOf(currentCollectionFilter) !== -1;
+    }) : items;
+    var allSelected = filtered.length > 0 && filtered.every(function (item) { return selectedCollectionItems.has(item.id); });
+    filtered.forEach(function (item) {
+      if (allSelected) selectedCollectionItems.delete(item.id); else selectedCollectionItems.add(item.id);
+    });
+    showCollectionPage(currentCollectionFilter);
+  }
+
+  function deleteSelectedCollections() {
+    selectedCollectionItems.forEach(function (id) { deleteCollectionsArchiveItem(id); });
+    selectedCollections.forEach(function (id) { deleteCollectionsAlbum(id); });
+    selectedCollectionItems.clear();
+    selectedCollections.clear();
+    showCollectionPage(currentCollectionFilter);
+  }
+
+  function openCollectionsMediaModal() {
+    var modal = document.getElementById('collections-media-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('collections-media-url').value = '';
+    document.getElementById('collections-media-source').value = '';
+    var albumsEl = document.getElementById('collections-media-albums');
+    var albums = getCollectionsAlbums();
+    albumsEl.innerHTML = albums.length === 0 ? '<p class="muted">No collections yet. Create one from the Collections page.</p>' :
+      '<label class="form-label">Add to collections</label>' + albums.map(function (a) {
+        return '<label class="album-checkbox-inline"><input type="checkbox" name="media-album" value="' + escapeHtmlCollections(a.id) + '"><span>' + escapeHtmlCollections(a.name) + '</span></label>';
+      }).join('');
+  }
+
+  function closeCollectionsMediaModal() {
+    var modal = document.getElementById('collections-media-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function saveFromCollectionsMediaModal() {
+    var urlInput = document.getElementById('collections-media-url');
+    var sourceInput = document.getElementById('collections-media-source');
+    var url = urlInput && urlInput.value.trim();
+    var source = sourceInput && sourceInput.value.trim();
+    var checked = document.querySelectorAll('#collections-media-albums input[name="media-album"]:checked');
+    var albumIds = Array.prototype.map.call(checked || [], function (c) { return c.value; });
+
+    if (!url || url.indexOf('http') !== 0) {
+      alert('Paste an image URL from the AT Protocol (e.g. Bluesky CDN) or any public image link. The image stays on the host; we only store the link.');
+      return;
+    }
+    var item = { type: 'image', imageUrl: url, source: source, albumIds: albumIds };
+    if (saveCollectionsArchiveItem(item)) {
+      closeCollectionsMediaModal();
+      showCollectionPage(currentCollectionFilter);
+    }
+  }
+
+  var collectionsModalBound = false;
+  function initCollections() {
+    showCollectionPage(currentCollectionFilter);
+    if (collectionsModalBound) return;
+    collectionsModalBound = true;
+    var closeBtn = document.getElementById('collections-media-close');
+    var backdrop = document.getElementById('collections-media-backdrop');
+    var cancelBtn = document.getElementById('collections-media-cancel');
+    var saveBtn = document.getElementById('collections-media-save');
+    if (closeBtn) closeBtn.addEventListener('click', closeCollectionsMediaModal);
+    if (backdrop) backdrop.addEventListener('click', closeCollectionsMediaModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeCollectionsMediaModal);
+    if (saveBtn) saveBtn.addEventListener('click', saveFromCollectionsMediaModal);
+  }
+
+  window.blendskyCollections = {
+    showCollectionPage: showCollectionPage,
+    filterCollectionByAlbum: filterCollectionByAlbum,
+    createAlbum: createAlbum,
+    viewArchiveItemPage: viewArchiveItemPage,
+    toggleCollectionEditMode: toggleCollectionEditMode,
+    openCollectionsMediaModal: openCollectionsMediaModal
+  };
 
   updateHeaderAuthState();
 
